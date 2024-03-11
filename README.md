@@ -1,2 +1,39 @@
-# induction-heater-controller
-MicroPython Pi Pico Induction Heater Controller
+# Induction Heater Controller
+
+A MicroPython-based induction heater controller with PID control for temperature regulation and simple interface.
+
+## Required Hardware
+
+- Raspberry Pi Pico
+- SSD1306 Display
+- MAX6675 + K Type Thermocouple
+- KY-040 Rotary Encoder
+- 5-12V ZVS Low Voltage Induction Heater(s) + Coil(s)
+- High-Power Mosfet Switch (one per induction coil)
+- DS18X20 Temperature Sensor (optional)
+- A suitable power supply for the ZVS circuits
+- Other useful bits: Push Button and LEDs
+
+## Example Hardware Layout
+
+```
+[Raspberry Pi Pico]
+    |
+    |---[GPIO 6] ----> [MAX6675 SCK]
+    |---[GPIO 7] ----> [MAX6675 CS]
+    |---[GPIO 8] ----> [MAX6675 SO]
+    |
+    |---[GPIO 1] ----> [SSD1306 SDA]
+    |---[GPIO 0] ----> [SSD1306 SCL]
+    |
+    |---[GPIO 12] ----> [Mosfet Switch] ----> [Induction Heater Coil 1]
+    |---[GPIO 13] ----> [Mosfet Switch] ----> [Induction Heater Coil 2]
+    |
+    |---[GPIO 5] ----> [Rotary Encoder CLK]
+    |---[GPIO 4] ----> [Rotary Encoder DT]
+    |---[GPIO 14] ---> [Button]
+    |
+    |---[GPIO 17] ---> [DS18X20 OneWire] //not really needed planned use to check on coil circuit temperatures
+```
+
+Note: This diagram excludes any power connections.
