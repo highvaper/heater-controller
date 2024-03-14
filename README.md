@@ -1,6 +1,6 @@
-# Induction Heater Controller
+# Heater Controller
 
-A MicroPython-based induction heater controller with PID control for temperature regulation and simple interface.
+A MicroPython-based heater controller with PID control for temperature regulation and simple interface.
 
 ## Required Hardware
 
@@ -8,16 +8,22 @@ A MicroPython-based induction heater controller with PID control for temperature
 - SSD1306 Display
 - MAX6675 + K Type Thermocouple
 - KY-040 Rotary Encoder
+- DS18X20 Temperature Sensor (optional)
+- Other bits: Push Button and LEDs, buzzer (optional)
+
+
+For induction based heater
 - 5-12V ZVS Low Voltage Induction Heater(s) + Coil(s)
 - High-Power Mosfet Switch (one per induction coil)
-- DS18X20 Temperature Sensor (optional)
 - A suitable power supply for the ZVS circuits
-- Other useful bits: Push Button and LEDs
+
 
 ## Example Hardware Layout
 
 ```
 [Raspberry Pi Pico]
+    |
+    |---[GPIO 18] ---> [LED]
     |
     |---[GPIO 6] ----> [MAX6675 SCK]
     |---[GPIO 7] ----> [MAX6675 CS]
