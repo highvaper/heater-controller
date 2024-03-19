@@ -257,7 +257,9 @@ class SharedState:
         self.pi_temperature = 0         # PI Pico chip temperature
         self.pi_temperature_limit = 60
 
-
+        #Maybe make below options have more info eg:
+        # setup_rotary_values in inputhandler 
+        # options screen timeout to return to home (or none for graphs etc)
         self.menu_options = ["MENU",
                              "Home Screen",
                              "Graph Setpoint",
@@ -441,8 +443,11 @@ pid.output_limits = (0, 10)
 
 ihTimer = Timer(-1) # need to replace with CustomTimer 
 
-heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
+#heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
+heater = HeaterFactory.create_heater('element', 13)
+
 heater.off()
+
 
 pidTimer = CustomTimer(371, machine.Timer.PERIODIC, timerUpdatePIDandHeater)  # need to have timer setup before calling below 
 shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater)
@@ -465,6 +470,18 @@ print("Timers initialised.")
 
 
 #watchdog = machine.WDT(timeout=(1000 * 8)) # 100 secs
+
+
+
+start_time = utime.ticks_ms()
+iteration_count = 0
+refresh_rate = 0
+
+# Sort of a load average 
+#start_times = [utime.ticks_ms(), utime.ticks_ms(), utime.ticks_ms()] 
+#iteration_counts = [0, 0, 0] 
+#period_durations = [1000, 10000, 30000]
+
 
 while True:
     if not shared_state.in_menu:
@@ -493,12 +510,36 @@ while True:
         else:
             pass
 
-   
-#   contrast = contrast - 1 
-    #display.contrast(contrast)
-    #print(str(contrast))
-    #if contrast < 0: contrast = 255
- #   watchdog.feed() # maybe have a check somewhere to make sure its ok to feed
-    utime.sleep_ms(75)
+#    watchdog.feed() # maybe have a check somewhere to make sure its ok to feed
+
+
+    iteration_count += 1
+    current_time = utime.ticks_ms()
+    elapsed_time = utime.ticks_diff(current_time, start_time)
+    if elapsed_time >= 1000: 
+        refresh_rate = iteration_count / (elapsed_time / 1000.0)
+       # print("Refresh rate:", refresh_rate, "Hz")
+        iteration_count = 0
+        start_time = utime.ticks_ms()
+
+## Sort of a load average 
+#    for i in range(len(iteration_counts)):
+#        current_time = utime.ticks_ms()
+#        elapsed_time = utime.ticks_diff(current_time, start_times[i])
+#        if elapsed_time > 0 and elapsed_time >= period_durations[i]:
+#            refresh_rate = iteration_counts[i] / (elapsed_time / 1000.0)
+#            t = f"1s: {iteration_counts[0] / (utime.ticks_diff(utime.ticks_ms(), start_times[0]) / 1000.0):.2f} Hz, "
+#            t = t + f"5s: {iteration_counts[1] / (utime.ticks_diff(utime.ticks_ms(), start_times[1]) / 1000.0):.2f} Hz, "
+#            t = t + f"15s: {iteration_counts[2] / (utime.ticks_diff(utime.ticks_ms(), start_times[2]) / 1000.0):.2f} Hz"
+#            print(t)
+#            #print(f"{period_durations[i] / 1000}s average refresh rate: {refresh_rate} Hz")
+#            iteration_counts[i] = 0
+#            start_times[i] = utime.ticks_ms()
+#        else:
+#            iteration_counts[i] += 1
+#    #print(str(iteration_counts))
+
+
+    utime.sleep_ms(70)
 
 
