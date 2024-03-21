@@ -326,7 +326,7 @@ class SharedState:
 
 print("LED Initialising ...")
 try:
-    led_pin = Pin(25, Pin.OUT) This is the built in pin on the pico
+    led_pin = Pin(25, Pin.OUT) #This is the built in pin on the pico
     led_pin.on()
     utime.sleep_ms(75)
     led_pin.off()
