@@ -313,7 +313,7 @@ class SharedState:
 #
 # Initialisation 
 #
-# The led should blink brielfly before the display powers up 
+# The led on the pico should blink brielfly before the display powers up 
 # if no led blink we have a problem but do not think there is a 
 # way to know so user needs to be aware that it should blink once breifly
 # 
@@ -324,17 +324,13 @@ class SharedState:
 #
 ###############################################################
 
-
-
-# Lets get most basic way to indicate there is an issue to the user 
-# if this doesnt work there isnt much else we can do 
-#
-# In readme maybe need to definea set LED Pin for people to use so we dont have
-# to deal with error trying to find it (ie loading from file and having 
-# and error trying that but note this could be edited it code)
 print("LED Initialising ...")
 try:
-    led_pin = Pin(18, Pin.OUT)
+    led_pin = Pin(25, Pin.OUT) This is the built in pin on the pico
+    led_pin.on()
+    utime.sleep_ms(75)
+    led_pin.off()
+    utime.sleep_ms(75)
     led_pin.on()
     utime.sleep_ms(75)
     led_pin.off()
@@ -353,9 +349,6 @@ shared_state = SharedState()
 #config = load_config(display)  # need to get config before displaymanager setup perhaps? so if error still need to show user
 #shared_state = SharedState(config)
  
-
-
-
 
 # DisplayManager
 try:
