@@ -53,17 +53,7 @@ https://www.raspberrypi.com/documentation/microcontrollers/micropython.html
 
 https://thonny.org/
 
-
-### Installing libraries
-
-1. **Open Thonny**: Launch Thonny and ensure Pi Pico is connected
-
-2. **Install simple-pid and ssd1306**: 
-    - Go to `Tools` > `Manage Packages`.
-    - Search for `simple-pid`.
-    - Install the package.
-
-### Upload files from repository
+## Upload files from repository
 
 In Thonny, use the `Tools` > `Upload Files` option.
 
