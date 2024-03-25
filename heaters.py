@@ -1,4 +1,5 @@
-from machine import Pin, Timer
+from machine import Pin, Timer, PWM
+import utime
 
 class BaseHeater(object):
     def __init__(self):
@@ -36,7 +37,7 @@ class InductionHeater(BaseHeater):
             self.coils[coil_no].off()
             coil_no += 1
 
-    def on(self):
+    def on(self, power=None):
         if self.coils:
             self.switched_on_coil = (self.last_coil_on + 1) % len(self.coils)
             self.coils[self.switched_on_coil].on()
@@ -79,23 +80,51 @@ class InductionHeater(BaseHeater):
 #        return self.is_on
 
 
+
+
 class ElementHeater(BaseHeater): 
     def __init__(self, element_pin):
-        super().__init__() # Initialise the BaseHeater attributes
+        super().__init__() 
         print("ElementHeater Initialising ...")
         self.element = Pin(element_pin, Pin.OUT)
-        self.element.off()
+        self.pwm = PWM(self.element) 
+        self.pwm.freq(8) # Maybe too much? need to see how this goes with nichrome
+        self.pwm.duty_u16(0) # Initialize PWM duty cycle to 0 (off)
         print("ElementHeater initialised.")
 
-    def on(self):
-        self.element.on()
+    def on(self, power=10): # Default to full power
+        duty_cycle = int(power * 6553.5) 
+        print(duty_cycle)
+        self.pwm.duty_u16(duty_cycle) 
         self._is_on = True
 
     def off(self):
-        self.element.off()
+        self.pwm.duty_u16(0) # Set PWM duty cycle to 0 (off)
         self._is_on = False
 
-#Possibly add other heaters with adjustable input power / extend element heater?
+    def set_power(self, power):
+        duty_cycle = int(power * 6553.5) 
+        print(duty_cycle)
+        self.pwm.duty_u16(duty_cycle)
+        self._is_on = power > 0
+
+
+#class ElementHeater(BaseHeater): 
+#    def __init__(self, element_pin):
+#        super().__init__() # Initialise the BaseHeater attributes
+#        print("ElementHeater Initialising ...")
+#        self.element = Pin(element_pin, Pin.OUT)
+#        self.element.off()
+#        print("ElementHeater initialised.")
+#
+#    def on(self):
+#        self.element.on()
+#        self._is_on = True
+#
+#    def off(self):
+#        self.element.off()
+#        self._is_on = False
+
 
 class HeaterFactory:
     def create_heater(heater_type, *args, **kwargs):

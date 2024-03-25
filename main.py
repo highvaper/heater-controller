@@ -206,16 +206,17 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
             error_text = "Pausing heater - " + MAIN_ERROR_MESSAGES["heater-too_hot"] + " " + str(shared_state.heater_temperature)
             print(error_text)
             display_manager.display_error("heater-too_hot",error_text,10,True)
-
         elif not heater.is_on():
             if shared_state.get_mode() != "Off":
-                heater.on()
+                heater.on(power)
+        if isinstance(heater, ElementHeater):
+            heater.set_power(power)
     else:
         if heater.is_on():
             heater.off()  #Maybe we call this no matter what just in case?
     
     t = ','.join(map(str, [pid._last_time, shared_state.heater_temperature, thermocouple.raw_temp, pid.setpoint, power, heater.is_on(), pid.components]))
-#    print(t)
+ #   print(t)
 
 
 
@@ -230,8 +231,17 @@ class SharedState:
 
         self.setpoint = 30     # Initial PID setpoint 
 
+        # When in session mode and we first hist setpoint make led change colour ?  and / or sound a buzzer 
+        # When session mode about to end (5 secs?) sound buzzer so user can extens easily -
+        # maybe popup with "extend session?" screen and on any click/rotate extent it
+
+        # need to check on max temp and how long its been above 250?  re Ptfe insulation and not keeping it too ig for too long 
+        # maybe have a timer for this?
+
         #self.power_threshold = 5  #between pid.output_limits range (1-10)
-        self.power_threshold = 1 #for slower sensors like DS18X20 probally lower is better
+        self.power_threshold = 0 #for slower sensors like DS18X20 probally lower is better 
+        #not sure if we need this for element heaters?  - if we use pwm for element heaters we will use the power for pwm
+        #need to work out rough temp x amount of power from pwm the element gets to so we dont go past xx watts / temps
 
         # for the filtered tempterature when induction is on 
         # possibly needs adjusting for different coil sizes/current/voltages - 
@@ -268,7 +278,12 @@ class SharedState:
                              "PI Temperature",
                              "Display Contrast"
                             ]
-                            
+                            # Battery/power info screen  - can we get volts & amps? and move to where pid is on home? + level 
+                            # Heater / coil info screen - coil length? coil ohm? (user may need to provide ohm reading at 25C)  
+                            # Need to look at using pid power returned and pwm for nichrome elements - also maybe some kind of amp limit so not to blow mosfets
+                            # Get varuous settings for elements in config file as may need to limit highest temp coil can get not to burn insulation PTFE 
+                            # ie despite pid/thermocouple - so tcr? or just limit wattage on known values for wire type/length/ohms so it doesnt get too hot 
+ 
         self.in_menu = False  # need to add get/set fnctions? 
         self.current_menu_position = 1 # need to add get/set functions? - dont let get more than one or count of options -1
         self.menu_selection_pending = False 
@@ -338,6 +353,11 @@ try:
 except Exception as e:
     print("Error initializing LED pin, unable to continue:", e)
     sys.exit()
+
+#Maybe still add an external led - colour one perhaps to indicate above/below/on temp to see from a distance?
+#make special colour for manual vs session?
+#also add buzzer to sound when session about to end as you dont notice 
+#maybe different buzz when first reaches setopoint that session 
 
 
 print("Display Initialising ...")
@@ -411,7 +431,7 @@ menu_system = MenuSystem(display_manager, shared_state)
 
 
 # PID
-pid = PID( (shared_state.setpoint * 0.1), (shared_state.setpoint * 0.02), (shared_state.setpoint * 0.01), setpoint = shared_state.setpoint )
+#pid = PID( (shared_state.setpoint * 0.1), (shared_state.setpoint * 0.02), (shared_state.setpoint * 0.01), setpoint = shared_state.setpoint, auto_mode = False )
 # when setpoint = 100  common values (10%, 2%, 1%) 
 # possibly move to shared_state something like: initial_P, initial_I, initial_D?
 
@@ -419,7 +439,7 @@ pid = PID( (shared_state.setpoint * 0.1), (shared_state.setpoint * 0.02), (share
 #pid = PID(0.6, 1.2, 0.001, setpoint = shared_state.setpoint)
 
 # Auto PID starting values:
-#pid = PID(setpoint = shared_state.setpoint)
+pid = PID(setpoint = shared_state.setpoint)
 
 # not sure if any value moving to shared state?
 pid.output_limits = (0, 10)
