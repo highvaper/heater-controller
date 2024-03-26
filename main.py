@@ -1,6 +1,6 @@
 import utime
 import sys
-from machine import ADC, Pin, I2C, Timer, PWM
+from machine import ADC, Pin, I2C, Timer, WDT, PWM
 from ssd1306 import SSD1306_I2C
 
 from simple_pid import PID
@@ -188,12 +188,12 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         # new off temperature is valid
         shared_state.heater_temperature = new_heater_temperature
 
-    if len(shared_state.temperature_readings) >= 128:
+    if len(shared_state.temperature_readings) >= 128: 
         oldest_time = min(shared_state.temperature_readings.keys())
         del shared_state.temperature_readings[oldest_time]
     shared_state.temperature_readings[utime.ticks_ms()] = int(shared_state.heater_temperature)
 
-    power = pid(shared_state.heater_temperature)  # Update let pid update even if heater is off
+    power = pid(shared_state.heater_temperature)  # Update pid even if heater is off
 
     if shared_state.get_mode() == "Off": 
         heater.off()
@@ -231,10 +231,10 @@ class SharedState:
         # All of the below hard coded can be loaded from a file or similar 
         # Need to add other stuff like butto click time, max temp, etc
         
-        self.session_timeout = 250 * 1000   # length of time for a session before auto off (3 mins)
+        self.session_timeout = 5 * 60 * 1000   # length of time for a session before auto off (5 mins)
         self.temperature_units = 'C'       # Not tested F at all 
 
-        self.setpoint = 130     # Initial PID setpoint 
+        self.setpoint = 180     # Initial PID setpoint 
 
         # When in session mode and we first hist setpoint make led change colour ?  and / or sound a buzzer 
         # When session mode about to end (5 secs?) sound buzzer so user can extens easily -
@@ -245,8 +245,6 @@ class SharedState:
 
         #self.power_threshold = 5  #between pid.output_limits range (1-10)
         self.power_threshold = 0 #for slower sensors like DS18X20 probally lower is better 
-        #not sure if we need this for element heaters?  - if we use pwm for element heaters we will use the power for pwm
-        #need to work out rough temp x amount of power from pwm the element gets to so we dont go past xx watts / temps
 
         # for the filtered tempterature when induction is on 
         # possibly needs adjusting for different coil sizes/current/voltages - 
@@ -267,10 +265,10 @@ class SharedState:
         self.temperature_readings =  {}
         
         self.heater_temperature = 0  # Overal induction heater temperature from thermocouple at the moment only deals with one 
-                                 # possibly extend to deal with multpile but not to start with
+                                     # possibly extend to deal with multpile but not to start with
         
         self.pi_temperature = 0         # PI Pico chip temperature
-        self.pi_temperature_limit = 60
+        self.pi_temperature_limit = 60  # Maybe place pico board above/next to mosfet module so we get some idea hot its getting 
 
         #Maybe make below options have more info eg:
         # setup_rotary_values in inputhandler 
@@ -306,9 +304,11 @@ class SharedState:
         if self._mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
             session_start_time = 0
             led_pin.off()
-            buzzer_play_tone(buzzer, 900, 50)
-            utime.sleep_ms(100)
-            buzzer_play_tone(buzzer, 900, 50)
+            buzzer_play_tone(buzzer, 1500, 200)
+            utime.sleep_ms(50)
+            buzzer_play_tone(buzzer, 1000, 200)
+            utime.sleep_ms(50)
+            buzzer_play_tone(buzzer, 500, 200)
             self.session_setpoint_reached = False
             self._mode = "Off"
         return self._mode
@@ -472,8 +472,7 @@ pid.output_limits = (0, 10)
 
 # InductionHeater
 
-ihTimer = Timer(-1) # need to replace with CustomTimer 
-
+#ihTimer = Timer(-1) # need to replace with CustomTimer 
 #heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
 heater = HeaterFactory.create_heater('element', 13)
 
@@ -500,7 +499,9 @@ print("Timers initialised.")
 
 
 
-#watchdog = machine.WDT(timeout=(1000 * 8)) # 100 secs
+# Lets enable and see if it helps when heater on and we crash
+# So far from simulated tests this seems to work and heater pin is reset
+watchdog = machine.WDT(timeout=(1000 * 3)) 
 
 
 
@@ -530,8 +531,7 @@ while True:
             menu_system.display_selected_option()
     else:
         if shared_state.rotary_last_mode != "menu": 
-            input_handler.setup_rotary_values()
-            
+            input_handler.setup_rotary_values()        
         if shared_state.menu_selection_pending:
             menu_system.handle_menu_selection()
             shared_state.menu_selection_pending = False
@@ -541,11 +541,16 @@ while True:
         else:
             pass
 
-#    watchdog.feed() # maybe have a check somewhere to make sure its ok to feed
+    
     if shared_state.get_mode() == "Session" and shared_state.session_setpoint_reached == False:
-         if shared_state.heater_temperature >= (shared_state.setpoint-2):  
+         if shared_state.heater_temperature >= (shared_state.setpoint-5):  
             shared_state.session_setpoint_reached = True
-            buzzer_play_tone(buzzer, 1500, 250)
+            buzzer_play_tone(buzzer, 1500, 350)
+
+    watchdog.feed() # maybe have a check somewhere to make sure its ok to feed 
+    
+    # need to check if heater is on and temps not rising to warn user after 10 sec? 
+    # eg heater pwm cable could be loose , no power to heater,  thermocouple issue 
     
     iteration_count += 1
     current_time = utime.ticks_ms()
