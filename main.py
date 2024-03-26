@@ -1,6 +1,6 @@
 import utime
 import sys
-from machine import ADC, Pin, I2C, Timer, WDT
+from machine import ADC, Pin, I2C, Timer, PWM
 from ssd1306 import SSD1306_I2C
 
 from simple_pid import PID
@@ -218,6 +218,11 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     t = ','.join(map(str, [pid._last_time, shared_state.heater_temperature, thermocouple.raw_temp, pid.setpoint, power, heater.is_on(), pid.components]))
  #   print(t)
 
+def buzzer_play_tone(buzzer, frequency, duration):
+    buzzer.freq(frequency)
+    buzzer.duty_u16(32768) # 50% duty cycle
+    utime.sleep_ms(duration)
+    buzzer.duty_u16(0) # Stop the buzzer
 
 
 class SharedState:
@@ -226,10 +231,10 @@ class SharedState:
         # All of the below hard coded can be loaded from a file or similar 
         # Need to add other stuff like butto click time, max temp, etc
         
-        self.session_timeout = 180 * 1000   # length of time for a session before auto off (3 mins)
+        self.session_timeout = 250 * 1000   # length of time for a session before auto off (3 mins)
         self.temperature_units = 'C'       # Not tested F at all 
 
-        self.setpoint = 30     # Initial PID setpoint 
+        self.setpoint = 130     # Initial PID setpoint 
 
         # When in session mode and we first hist setpoint make led change colour ?  and / or sound a buzzer 
         # When session mode about to end (5 secs?) sound buzzer so user can extens easily -
@@ -293,6 +298,7 @@ class SharedState:
         self.rotary_last_mode = None
 
         self.session_start_time = 0
+        self.session_setpoint_reached = False
         self._mode = "Off" 
 
 
@@ -300,10 +306,15 @@ class SharedState:
         if self._mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
             session_start_time = 0
             led_pin.off()
+            buzzer_play_tone(buzzer, 900, 50)
+            utime.sleep_ms(100)
+            buzzer_play_tone(buzzer, 900, 50)
+            self.session_setpoint_reached = False
             self._mode = "Off"
         return self._mode
 
     def set_mode(self, new_mode):
+        self.session_setpoint_reached = False
         if new_mode in ["Off", "Manual"]:
             if self._mode == "Session": self.session_start_time = 0
             self._mode = new_mode
@@ -388,6 +399,13 @@ except Exception as e:
 
 
 
+# Buzzer - 2 short buzzes for notifying user session has ended 
+#        - 1 buzz when hitting setpoint for first time in a session
+
+buzzer = PWM(Pin(16))
+
+
+
 # Maybe put in function reset when options reloaded as they may affect settings
 #Termocouple K type
 #MAX6675
@@ -438,7 +456,7 @@ menu_system = MenuSystem(display_manager, shared_state)
 # Ziegler-Nichols method for a system with a fast response time
 #pid = PID(0.6, 1.2, 0.001, setpoint = shared_state.setpoint)
 
-# Auto PID starting values:
+# Auto PID starting values - seems to work well with element heater
 pid = PID(setpoint = shared_state.setpoint)
 
 # not sure if any value moving to shared state?
@@ -503,7 +521,7 @@ while True:
             if shared_state.rotary_last_mode != "setpoint": 
                 input_handler.setup_rotary_values()
             shared_state.current_menu_position = 1
-            display_manager.show_screen_home_screen(pid.components, heater.is_on())
+            display_manager.show_screen_home_screen(pid.components, heater)
             display_manager.display_heartbeat()
         else:
             if shared_state.rotary_last_mode != shared_state.menu_options[shared_state.current_menu_position]: 
@@ -524,8 +542,11 @@ while True:
             pass
 
 #    watchdog.feed() # maybe have a check somewhere to make sure its ok to feed
-
-
+    if shared_state.get_mode() == "Session" and shared_state.session_setpoint_reached == False:
+         if shared_state.heater_temperature >= (shared_state.setpoint-2):  
+            shared_state.session_setpoint_reached = True
+            buzzer_play_tone(buzzer, 1500, 250)
+    
     iteration_count += 1
     current_time = utime.ticks_ms()
     elapsed_time = utime.ticks_diff(current_time, start_time)

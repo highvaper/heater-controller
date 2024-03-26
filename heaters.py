@@ -4,7 +4,6 @@ import utime
 class BaseHeater(object):
     def __init__(self):
         self._is_on = False
-
     def on(self):
         raise NotImplementedError("Subclasses must implement this method")
 
@@ -90,6 +89,7 @@ class ElementHeater(BaseHeater):
         self.pwm = PWM(self.element) 
         self.pwm.freq(8) # Maybe too much? need to see how this goes with nichrome
         self.pwm.duty_u16(0) # Initialize PWM duty cycle to 0 (off)
+        self._power = 0
         print("ElementHeater initialised.")
 
     def on(self, power=10): # Default to full power
@@ -107,7 +107,10 @@ class ElementHeater(BaseHeater):
         print(duty_cycle)
         self.pwm.duty_u16(duty_cycle)
         self._is_on = power > 0
+        self._power = power
 
+    def get_power(self):
+        return self._power
 
 #class ElementHeater(BaseHeater): 
 #    def __init__(self, element_pin):

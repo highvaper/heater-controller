@@ -1,5 +1,6 @@
 import utime
 #from customtimer import CustomTimer
+from heaters import HeaterFactory, InductionHeater, ElementHeater
 
 class DisplayManager:
     
@@ -266,7 +267,7 @@ class DisplayManager:
         return (display_width - text_width) // 2
 
 
-    def show_screen_home_screen(self, pid_components, heater_status):
+    def show_screen_home_screen(self, pid_components, heater):
         self.display.fill(0)
         shared_state = self.shared_state
         if shared_state.temperature_units == 'F':
@@ -275,7 +276,12 @@ class DisplayManager:
             t = "H: " + str(int(shared_state.heater_temperature)) + "C (" + str(int(shared_state.setpoint)) + "C)"
         self.display.text(t, 0, 0)
 
-        t = "H: On" if heater_status else "H: Off"
+        if heater.is_on():
+            t = "H: On"
+            if isinstance(heater, ElementHeater):
+                t = t + " P: " + str(heater.get_power())
+        else:
+            t = "H: Off"
         self.display.text(t, 0, 8)
 
         # Add PI temperature to menu somewhere
