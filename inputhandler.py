@@ -33,7 +33,7 @@ class InputHandler:
             self.rotary.set(max_val=len(self.shared_state.menu_options)-1)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_WRAP)
             self.shared_state.rotary_last_mode = "menu"
-            print("setup rotart menu" + str(self.rotary.value()))
+            print("setup rotarty menu" + str(self.rotary.value()))
         elif self.shared_state.rotary_last_mode != "Display Contrast" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Display Contrast":
             self.rotary.set(value=self.shared_state.display_contrast)
             self.previous_rotary_value = self.shared_state.display_contrast
@@ -41,7 +41,7 @@ class InputHandler:
             self.rotary.set(max_val=255)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Display Contrast"
-            print("setup rotart contrast" + str(self.rotary.value()))
+            print("setup rotarty contrast" + str(self.rotary.value()))
         else:
             if self.shared_state.rotary_last_mode != "setpoint":
                 self.rotary.set(value=self.shared_state.setpoint)
@@ -50,7 +50,7 @@ class InputHandler:
                 self.rotary.set(max_val=self.shared_state.max_allowed_setpoint)  # Max temp - allow conversion to F?
                 self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
                 self.shared_state.rotary_last_mode = "setpoint"
-                print("setup rotart setpoint" + str(self.rotary.value()))
+                print("setup rotarty setpoint" + str(self.rotary.value()))
 
     def rotary_callback(self):
     
@@ -70,7 +70,7 @@ class InputHandler:
                 self.shared_state.setpoint = self.rotary.value()
 
         self.previous_rotary_value = self.rotary.value()
-        print(f"{self.shared_state.rotary_last_mode} Prvious Rot: {self.previous_rotary_value}, Rotary value: {self.rotary.value()}")
+        #print(f"{self.shared_state.rotary_last_mode} Prvious Rotary: {self.previous_rotary_value}, Rotary value: {self.rotary.value()}")
         if self.button_pressed: self.rotary_used = True
 
     def button_state_changed(self, pin):
