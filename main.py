@@ -474,7 +474,14 @@ pid.output_limits = (0, 10)
 
 #ihTimer = Timer(-1) # need to replace with CustomTimer 
 #heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
+
 heater = HeaterFactory.create_heater('element', 13)
+
+# Limit max_duty_cycle_percent - use this if you need to protect power supply
+# eg: max power supply watts: 120W - 12v @ 10A Max
+#     If we know the element will pull 200W (from resitance of it and supply voltage)
+#     need to limit pwm cyle to 120/200 * 100 = 60% 
+#heater = HeaterFactory.create_heater('element', 13, 55)  # Maybe set a bit lower though just incase
 
 heater.off()
 
