@@ -27,8 +27,8 @@ class InputHandler:
 
     def setup_rotary_values(self):
         if self.shared_state.rotary_last_mode != "menu" and self.shared_state.in_menu:
-            self.rotary.set(value=self.shared_state.current_menu_position)
-            self.previous_rotary_value = self.shared_state.current_menu_position 
+            self.rotary.set(value=self.shared_state.current_menu_position-1)
+            self.previous_rotary_value = self.shared_state.current_menu_position-1
             self.rotary.set(min_val=1)
             self.rotary.set(max_val=len(self.shared_state.menu_options)-1)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_WRAP)
@@ -116,14 +116,21 @@ class InputHandler:
             print('Triple click detected')
             if not self.shared_state.in_menu and not self.rotary_used:
                 if self.shared_state.get_mode() == "Off" :
-                    self.shared_state.set_mode("Session") 
                     print("Switching to Session mode")
+                    self.shared_state.set_mode("Session") 
                 elif self.shared_state.get_mode() == "Session":
                     self.shared_state.set_mode("Off")
                     #print("Stopped Session mode")
                     
         elif self.click_counter == 4:
             print('Quadruple click detected')
+            if not self.shared_state.in_menu and not self.rotary_used:
+                if self.shared_state.get_mode() == "Off" :
+                    print("Switching to Session mode for 1 minute")
+                    self.shared_state.set_mode("Session") 
+                    self.shared_state.session_start_time = (utime.ticks_ms() - (self.shared_state.session_timeout - 60000))
+                #elif self.shared_state.get_mode() == "Session":
+                #    self.shared_state.set_mode("Off")
         else:
             print(self.click_counter, ' clicks detected')
             

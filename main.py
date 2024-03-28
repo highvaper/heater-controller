@@ -288,7 +288,7 @@ class SharedState:
                             # ie despite pid/thermocouple - so tcr? or just limit wattage on known values for wire type/length/ohms so it doesnt get too hot 
  
         self.in_menu = False  # need to add get/set fnctions? 
-        self.current_menu_position = 1 # need to add get/set functions? - dont let get more than one or count of options -1
+        self.current_menu_position = 0 # need to add get/set functions? - dont let get more than one or count of options -1
         self.menu_selection_pending = False 
         self.menu_timeout = 3 * 1000   # 3 secs
         
@@ -305,9 +305,9 @@ class SharedState:
             session_start_time = 0
             led_pin.off()
             buzzer_play_tone(buzzer, 1500, 200)
-            utime.sleep_ms(50)
+            utime.sleep_ms(200)
             buzzer_play_tone(buzzer, 1000, 200)
-            utime.sleep_ms(50)
+            utime.sleep_ms(200)
             buzzer_play_tone(buzzer, 500, 200)
             self.session_setpoint_reached = False
             self._mode = "Off"
@@ -481,7 +481,8 @@ heater = HeaterFactory.create_heater('element', 13)
 # eg: max power supply watts: 120W - 12v @ 10A Max
 #     If we know the element will pull 200W (from resitance of it and supply voltage)
 #     need to limit pwm cyle to 120/200 * 100 = 60% 
-#heater = HeaterFactory.create_heater('element', 13, 55)  # Maybe set a bit lower though just incase
+
+#heater = HeaterFactory.create_heater('element', 13, 90)  
 
 heater.off()
 
