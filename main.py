@@ -283,7 +283,9 @@ class SharedState:
                             ]
                             # Battery/power info screen  - can we get volts & amps? and move to where pid is on home? + level 
                             # Heater / coil info screen - coil length? coil ohm? (user may need to provide ohm reading at 25C)  
-                            # Need to look at using pid power returned and pwm for nichrome elements - also maybe some kind of amp limit so not to blow mosfets
+                            # Get resitance ? - its possible for the pico to work out the element reistance and approximate wattsage 
+                            # to help user work out a limit - would need to be super careful to only happen when element has no power 
+                            # Maybe use pwm heater pins and reconfigure them for this and need a reboot once done?
                             # Get varuous settings for elements in config file as may need to limit highest temp coil can get not to burn insulation PTFE 
                             # ie despite pid/thermocouple - so tcr? or just limit wattage on known values for wire type/length/ohms so it doesnt get too hot 
  
@@ -360,7 +362,7 @@ try:
     led_pin.on()
     utime.sleep_ms(75)
     led_pin.off()
-    print("LED initialised ...")
+    print("LED initialised.")
 except Exception as e:
     print("Error initializing LED pin, unable to continue:", e)
     sys.exit()
@@ -401,8 +403,10 @@ except Exception as e:
 
 # Buzzer - 2 short buzzes for notifying user session has ended 
 #        - 1 buzz when hitting setpoint for first time in a session
-
+print("Buzzer Initialising ...")
 buzzer = PWM(Pin(16))
+buzzer_play_tone(buzzer, 2500, 200)  # Play a sound so we know its connected correctly
+print("Buzzer initialised.")
 
 
 
@@ -475,14 +479,14 @@ pid.output_limits = (0, 10)
 #ihTimer = Timer(-1) # need to replace with CustomTimer 
 #heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
 
-heater = HeaterFactory.create_heater('element', 13)
 
 # Limit max_duty_cycle_percent - use this if you need to protect power supply
 # eg: max power supply watts: 120W - 12v @ 10A Max
 #     If we know the element will pull 200W (from resitance of it and supply voltage)
 #     need to limit pwm cyle to 120/200 * 100 = 60% 
-
-#heater = HeaterFactory.create_heater('element', 13, 90)  
+#
+#heater = HeaterFactory.create_heater('element', 13, 60)  
+heater = HeaterFactory.create_heater('element', 13) # no limit
 
 heater.off()
 
