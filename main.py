@@ -285,7 +285,7 @@ class SharedState:
                             # Heater / coil info screen - coil length? coil ohm? (user may need to provide ohm reading at 25C)  
                             # Get resitance ? - its possible for the pico to work out the element reistance and approximate wattsage 
                             # to help user work out a limit - would need to be super careful to only happen when element has no power 
-                            # Maybe use pwm heater pins and reconfigure them for this and need a reboot once done?
+                            # Maybe use pwm heater pins and reconfigure them for to get the resitnace and need a reboot once done?
                             # Get varuous settings for elements in config file as may need to limit highest temp coil can get not to burn insulation PTFE 
                             # ie despite pid/thermocouple - so tcr? or just limit wattage on known values for wire type/length/ohms so it doesnt get too hot 
  
@@ -329,6 +329,7 @@ class SharedState:
             led_pin.off()
         else:
             led_pin.on()
+            pid.reset()
             
     def get_session_mode_duration(self):
         return utime.ticks_diff(utime.ticks_ms(), self.session_start_time)
@@ -462,9 +463,23 @@ menu_system = MenuSystem(display_manager, shared_state)
 
 # Auto PID starting values - seems to work well with element heater
 pid = PID(setpoint = shared_state.setpoint)
-
+#pid = PID(0.3, 0.9, 0.005, setpoint = shared_state.setpoint)
 # not sure if any value moving to shared state?
 pid.output_limits = (0, 10)
+
+
+
+tunings = 0.48, 0.006, 0.0001
+#0.005,0
+#0.00015
+
+#tunings = (shared_state.setpoint * 0.005), (shared_state.setpoint * 0.0005), (shared_state.setpoint * 0.0001)
+#tunings = (shared_state.setpoint * 0.006)/2, shared_state.setpoint * 0.00015,  shared_state.setpoint * 0.00005, 
+
+print(pid.tunings)
+pid.tunings = tunings
+print(pid.tunings)
+
 
 #read before trying to tune: http://brettbeauregard.com/blog/2017/06/introducing-proportional-on-measurement/
 #pid.differential_on_measurement = True   #Either this or the below not both - this is the default for PID
@@ -485,7 +500,7 @@ pid.output_limits = (0, 10)
 #     If we know the element will pull 200W (from resitance of it and supply voltage)
 #     need to limit pwm cyle to 120/200 * 100 = 60% 
 #
-#heater = HeaterFactory.create_heater('element', 13, 60)  
+#heater = HeaterFactory.create_heater('element', 13, 40)  
 heater = HeaterFactory.create_heater('element', 13) # no limit
 
 heater.off()
