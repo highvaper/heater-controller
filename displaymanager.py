@@ -9,11 +9,12 @@ class DisplayManager:
         print("DisplayManager Initialising ...")
         self.display = display
         self.shared_state = shared_state
-        self.display.rotate(True)
         self.display_heartbeat_y = 0
         self.growing = True
         self.scroll_position = 0
         self.display.contrast(self.shared_state.display_contrast)
+        self.display.rotate(self.shared_state.display_rotate)
+
         print("DisplayManager initialised.")
 
 
@@ -271,18 +272,23 @@ class DisplayManager:
         self.display.fill(0)
         shared_state = self.shared_state
         if shared_state.temperature_units == 'F':
-            t = "H: " + str(int(32 + (1.8 * shared_state.heater_temperature))) + "F (" + str(int(32 + (1.8 * shared_state.setpoint))) + "F)"
+            t = "T: " + str(int(32 + (1.8 * shared_state.heater_temperature))) + "F (" + str(int(32 + (1.8 * shared_state.setpoint))) + "F)"
         else:
-            t = "H: " + str(int(shared_state.heater_temperature)) + "C (" + str(int(shared_state.setpoint)) + "C)"
+            t = "T: " + str(int(shared_state.heater_temperature)) + "C (" + str(int(shared_state.setpoint)) + "C)"
         self.display.text(t, 0, 0)
 
         if heater.is_on():
             t = "H: On"
             if isinstance(heater, ElementHeater):
-                t = t + " P: " + str(heater.get_power())
+                t = t + " P: " + "{:.2f}".format(heater.get_power())
         else:
             t = "H: Off"
+
         self.display.text(t, 0, 8)
+
+        t = "M: " + shared_state.get_mode()
+        if shared_state.get_mode() == "Session":
+            t = t + " " + str(int((shared_state.session_timeout - shared_state.get_session_mode_duration())/1000)) + "s"
 
         # Add PI temperature to menu somewhere
         #pi_temperature = shared_state.get_pi_temperature()
@@ -291,14 +297,10 @@ class DisplayManager:
         #else:
         #    t = "Mode: " + str(int(pi_temperature)) + "C"
         
-        t = "Mode: " + shared_state.get_mode()
         self.display.text(t, 0, 16)
         
-        if shared_state.get_mode() == "Session":
-            t = "Duration: " + str(int((shared_state.session_timeout - shared_state.get_session_mode_duration())/1000)) + " secs"
-        else:
-            p, i, d = pid_components
-            t = "{:.1f} {:.2f} {:.2f}".format(p, i, d)
+        p, i, d = pid_components
+        t = "{:.1f} {:.2f} {:.2f}".format(p, i, d)
         self.display.text(t, 0, 24)
 
 

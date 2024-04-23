@@ -12,8 +12,25 @@ from displaymanager import DisplayManager
 from inputhandler import InputHandler
 from menusystem import MenuSystem
 
-#from inductionheater import InductionHeater
 from heaters import HeaterFactory, InductionHeater, ElementHeater
+
+
+hardware_pin_led = 25 # default one on the pico could change to a different pin if wanted 
+
+hardware_pin_display_scl = 21
+hardware_pin_display_sda = 20
+
+hardware_pin_buzzer = 16
+
+hardware_pin_rotary_clk = 13
+hardware_pin_rotary_dt = 12
+hardware_pin_button = 14  #can also be a separate button as well as rotary push/sw pin - just wire all together
+
+hardware_pin_termocouple_sck = 6
+hardware_pin_termocouple_cs = 7 
+hardware_pin_termocouple_so = 8
+
+hardware_pin_heater = 22
 
 
 #to kill?
@@ -24,7 +41,7 @@ from heaters import HeaterFactory, InductionHeater, ElementHeater
 # Format:  main_system-error_code
 
 MAIN_ERROR_MESSAGES = {"display-setup":      "Error initializing display, cannout continue",
-                       "heater-too_hot":     "Induction heater too hot > 300C",
+                       "heater-too_hot":     "Heater too hot > 300C",
                        "pi-too_hot":         "PI too hot > 60C"
 }
 
@@ -254,7 +271,8 @@ class SharedState:
         self.heater_on_temperature_difference_threshold = 20 
 
         self.display_contrast = 255   # allow change by option in menu
-
+        self.display_rotate = True
+        
         # Below is stuff perhaps better to leave alone
         self.click_check_timeout = 800 # ms timeout to multi click in 
         self.max_allowed_setpoint = 299 # max allowed temperature
@@ -330,6 +348,7 @@ class SharedState:
         else:
             led_pin.on()
             pid.reset()
+            print("PID Stats reset")
             
     def get_session_mode_duration(self):
         return utime.ticks_diff(utime.ticks_ms(), self.session_start_time)
@@ -355,7 +374,7 @@ class SharedState:
 
 print("LED Initialising ...")
 try:
-    led_pin = Pin(25, Pin.OUT) #This is the built in pin on the pico
+    led_pin = Pin(hardware_pin_led, Pin.OUT) #This is the built in pin on the pico
     led_pin.on()
     utime.sleep_ms(75)
     led_pin.off()
@@ -375,7 +394,7 @@ except Exception as e:
 
 
 print("Display Initialising ...")
-display = initialize_display(i2c_scl=1, i2c_sda=0, led_pin=led_pin)  # Move to HARDWARE.conf ?
+display = initialize_display(hardware_pin_display_scl, hardware_pin_display_sda, led_pin)  # Move to HARDWARE.conf ?
 print("Display initialised.")
 
 shared_state = SharedState()
@@ -405,7 +424,7 @@ except Exception as e:
 # Buzzer - 2 short buzzes for notifying user session has ended 
 #        - 1 buzz when hitting setpoint for first time in a session
 print("Buzzer Initialising ...")
-buzzer = PWM(Pin(16))
+buzzer = PWM(Pin(hardware_pin_buzzer))
 buzzer_play_tone(buzzer, 2500, 200)  # Play a sound so we know its connected correctly
 print("Buzzer initialised.")
 
@@ -414,13 +433,11 @@ print("Buzzer initialised.")
 # Maybe put in function reset when options reloaded as they may affect settings
 #Termocouple K type
 #MAX6675
-#sck = Pin No 6
-#cs = Pin No 7
-#so = Pin No 8
+
 # Initialize termocouple before switching on induction heater
 try:
     utime.sleep_ms(700)
-    thermocouple = Thermocouple(6, 7, 8, shared_state.heater_on_temperature_difference_threshold)
+    thermocouple = Thermocouple(hardware_pin_termocouple_sck, hardware_pin_termocouple_cs, hardware_pin_termocouple_so, shared_state.heater_on_temperature_difference_threshold)
     utime.sleep_ms(350)
     _, _ = thermocouple.get_filtered_temp(False)  # Sets: last_known_safe_temp - Do here rather than in class as it sometimes returns error if on class init 
 except Exception as e:
@@ -446,8 +463,9 @@ except Exception as e:
 pi_temperature_sensor = machine.ADC(4)
 shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor)
 
+
 # InputHandler
-input_handler = InputHandler(rotary_clk_pin=5, rotary_dt_pin=4, button_pin=14, shared_state=shared_state)
+input_handler = InputHandler(rotary_clk_pin=hardware_pin_rotary_clk, rotary_dt_pin=hardware_pin_rotary_dt, button_pin=hardware_pin_button, shared_state=shared_state)
 
 # MenuSystem
 menu_system = MenuSystem(display_manager, shared_state)
@@ -469,9 +487,13 @@ pid.output_limits = (0, 10)
 
 
 
-tunings = 0.48, 0.006, 0.0001
+#tunings = 0.48, 0.006, 0.0001
 #0.005,0
 #0.00015
+
+tunings = 0.48, 0.004, 0
+
+#tunings = 0.12, 0.003, 0
 
 #tunings = (shared_state.setpoint * 0.005), (shared_state.setpoint * 0.0005), (shared_state.setpoint * 0.0001)
 #tunings = (shared_state.setpoint * 0.006)/2, shared_state.setpoint * 0.00015,  shared_state.setpoint * 0.00005, 
@@ -500,8 +522,9 @@ print(pid.tunings)
 #     If we know the element will pull 200W (from resitance of it and supply voltage)
 #     need to limit pwm cyle to 120/200 * 100 = 60% 
 #
-#heater = HeaterFactory.create_heater('element', 13, 40)  
-heater = HeaterFactory.create_heater('element', 13) # no limit
+heater = HeaterFactory.create_heater('element', hardware_pin_heater, 80)  
+
+#heater = HeaterFactory.create_heater('element', hardware_pin_heater) # no limit
 
 heater.off()
 
@@ -511,6 +534,7 @@ shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_erro
 
 print("Timers Initialising ...")
 pidTimer.start()
+pid.reset()
 
 
 piTempTimer = CustomTimer(903, machine.Timer.PERIODIC, timerSetPiTemp)
@@ -570,9 +594,10 @@ while True:
 
     
     if shared_state.get_mode() == "Session" and shared_state.session_setpoint_reached == False:
-         if shared_state.heater_temperature >= (shared_state.setpoint-5):  
+         if shared_state.heater_temperature >= (shared_state.setpoint-8):  
             shared_state.session_setpoint_reached = True
             buzzer_play_tone(buzzer, 1500, 350)
+            pid.reset()  # Seems to help improve overshoot reduction resetting pid stats once near setpoint from cold
 
     watchdog.feed() # maybe have a check somewhere to make sure its ok to feed 
     
