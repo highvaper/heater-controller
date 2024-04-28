@@ -324,13 +324,13 @@ class SharedState:
         if self._mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
             session_start_time = 0
             led_pin.off()
+            self._mode = "Off"  # Set off here rather than after playing sounds as this can get called again while sounds being played
+            self.session_setpoint_reached = False
             buzzer_play_tone(buzzer, 1500, 200)
             utime.sleep_ms(200)
             buzzer_play_tone(buzzer, 1000, 200)
             utime.sleep_ms(200)
             buzzer_play_tone(buzzer, 500, 200)
-            self.session_setpoint_reached = False
-            self._mode = "Off"
         return self._mode
 
     def set_mode(self, new_mode):
@@ -494,7 +494,7 @@ pid.output_limits = (0, 10)
 #tunings = 0.48, 0.004, 0   #18mm + nichrome 2mm
 
 
-tunings = 0.18, 0.003, 0.002
+tunings = 0.28, 0.003, 0.0001
 
 #tunings = (shared_state.setpoint * 0.005), (shared_state.setpoint * 0.0005), (shared_state.setpoint * 0.0001)
 #tunings = (shared_state.setpoint * 0.006)/2, shared_state.setpoint * 0.00015,  shared_state.setpoint * 0.00005, 
@@ -523,7 +523,7 @@ print(pid.tunings)
 #     If we know the element will pull 200W (from resitance of it and supply voltage)
 #     need to limit pwm cyle to 120/200 * 100 = 60% 
 #
-heater = HeaterFactory.create_heater('element', hardware_pin_heater, 80)   # changing the limit will mess with PID tuning
+heater = HeaterFactory.create_heater('element', hardware_pin_heater, 70)   # changing the limit will mess with PID tuning
 
 #heater = HeaterFactory.create_heater('element', hardware_pin_heater) # no limit
 
@@ -598,7 +598,7 @@ while True:
          if shared_state.heater_temperature >= (shared_state.setpoint-8):  
             shared_state.session_setpoint_reached = True
             buzzer_play_tone(buzzer, 1500, 350)
-            #pid.reset()  # Seems to help improve overshoot reduction resetting pid stats once near setpoint from cold
+            pid.reset()  # Seems to help improve overshoot reduction resetting pid stats once near setpoint from cold
 
     watchdog.feed() # maybe have a check somewhere to make sure its ok to feed 
     
