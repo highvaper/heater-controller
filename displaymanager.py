@@ -92,9 +92,11 @@ class DisplayManager:
     def show_startup_screen(self):
         # Clear the display and show the first set of messages
         self.display.fill(0) 
-        self.display.text('     Pi Pico     ', 0, 1, 1)
-        self.display.text('Heater Controller', 0, 11, 1)
-        self.display.text('      v0.1       ', 0, 22, 1)
+
+        self.display.text('Pi Pico',  self.get_centered_text_start_position('Pi Pico'), 0, 1)
+        self.display.text('Heater', self.get_centered_text_start_position('Heater'), 8, 1)
+        self.display.text('Controller', self.get_centered_text_start_position('Controller'), 16, 1)
+        self.display.text('v0.1', self.get_centered_text_start_position('v0.1'), 24, 1)
         self.display.show()
         utime.sleep_ms(2000) # Wait for 2 seconds to display the first set of messages
 

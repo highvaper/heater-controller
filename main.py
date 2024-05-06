@@ -15,7 +15,21 @@ from menusystem import MenuSystem
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
 
-hardware_pin_led = 25 # default one on the pico could change to a different pin if wanted 
+#pid_tunings = 0.48, 0.004, 0   #18mm + nichrome 2mm
+pid_tunings = 0.33, 0.0012, 0   #20mm + nichrome 3mm
+
+
+# Limit max_duty_cycle_percent - use this if you need to protect power supply/batteries 
+# eg: max power supply watts: 120W - 12v @ 10A Max
+#     If we know the element will pull 200W (from resitance of it and supply voltage)
+#     need to limit pwm cyle to 120/200 * 100 = 60% 
+#
+# After changing this the pid tunings may need to be updated
+
+heater_max_duty_cycle_percent = 70  #set to 100 for no limit 
+
+
+hardware_pin_led = 25 # default led on the pico could change to a different led on a pin if wanted eg for external housing
 
 hardware_pin_display_scl = 21
 hardware_pin_display_sda = 20
@@ -24,7 +38,7 @@ hardware_pin_buzzer = 16
 
 hardware_pin_rotary_clk = 13
 hardware_pin_rotary_dt = 12
-hardware_pin_button = 14  #can also be a separate button as well as rotary push/sw pin - just wire all together
+hardware_pin_button = 14  #can also be a separate button as well as rotary push/sw pin - just wire both switches to pin and ground
 
 hardware_pin_termocouple_sck = 6
 hardware_pin_termocouple_cs = 7 
@@ -487,20 +501,16 @@ pid.output_limits = (0, 10)
 
 
 
-#tunings = 0.48, 0.006, 0.0001
+#pid_tunings = 0.48, 0.006, 0.0001
 #0.005,0
 #0.00015
 
-#tunings = 0.48, 0.004, 0   #18mm + nichrome 2mm
 
-
-tunings = 0.28, 0.003, 0.0001
-
-#tunings = (shared_state.setpoint * 0.005), (shared_state.setpoint * 0.0005), (shared_state.setpoint * 0.0001)
-#tunings = (shared_state.setpoint * 0.006)/2, shared_state.setpoint * 0.00015,  shared_state.setpoint * 0.00005, 
+#pid_tunings = (shared_state.setpoint * 0.005), (shared_state.setpoint * 0.0005), (shared_state.setpoint * 0.0001)
+#pid_tunings = (shared_state.setpoint * 0.006)/2, shared_state.setpoint * 0.00015,  shared_state.setpoint * 0.00005, 
 
 print(pid.tunings)
-pid.tunings = tunings
+pid.tunings = pid_tunings
 print(pid.tunings)
 
 
@@ -517,15 +527,11 @@ print(pid.tunings)
 #ihTimer = Timer(-1) # need to replace with CustomTimer 
 #heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
 
-
-# Limit max_duty_cycle_percent - use this if you need to protect power supply
-# eg: max power supply watts: 120W - 12v @ 10A Max
-#     If we know the element will pull 200W (from resitance of it and supply voltage)
-#     need to limit pwm cyle to 120/200 * 100 = 60% 
-#
-heater = HeaterFactory.create_heater('element', hardware_pin_heater, 70)   # changing the limit will mess with PID tuning
+heater = HeaterFactory.create_heater('element', hardware_pin_heater, heater_max_duty_cycle_percent)   # changing the limit will mess with PID tuning
 
 #heater = HeaterFactory.create_heater('element', hardware_pin_heater) # no limit
+#heater = HeaterFactory.create_heater('element', hardware_pin_heater, 100) # no limit
+
 
 heater.off()
 
@@ -553,7 +559,8 @@ print("Timers initialised.")
 
 # Lets enable and see if it helps when heater on and we crash
 # So far from simulated tests this seems to work and heater pin is reset
-watchdog = machine.WDT(timeout=(1000 * 3)) 
+
+#watchdog = machine.WDT(timeout=(1000 * 3)) 
 
 
 
@@ -583,7 +590,7 @@ while True:
             menu_system.display_selected_option()
     else:
         if shared_state.rotary_last_mode != "menu": 
-            input_handler.setup_rotary_values()        
+            input_handler.setup_rotary_values()
         if shared_state.menu_selection_pending:
             menu_system.handle_menu_selection()
             shared_state.menu_selection_pending = False
@@ -598,9 +605,9 @@ while True:
          if shared_state.heater_temperature >= (shared_state.setpoint-8):  
             shared_state.session_setpoint_reached = True
             buzzer_play_tone(buzzer, 1500, 350)
-            pid.reset()  # Seems to help improve overshoot reduction resetting pid stats once near setpoint from cold
+            #pid.reset()  # Seems to help improve overshoot reduction resetting pid stats once near setpoint from cold
 
-    watchdog.feed() # maybe have a check somewhere to make sure its ok to feed 
+    #watchdog.feed() # maybe have a check somewhere to make sure its ok to feed 
     
     # need to check if heater is on and temps not rising to warn user after 10 sec? 
     # eg heater pwm cable could be loose , no power to heater,  thermocouple issue 
