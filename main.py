@@ -28,6 +28,7 @@ pid_tunings = 0.33, 0.0012, 0   #20mm + nichrome 3mm
 
 heater_max_duty_cycle_percent = 70  #set to 100 for no limit 
 
+enable_watchdog = True # Turn off when tuning pid as you need to unplug/plug usb cable each time you ctrl+c other wise
 
 hardware_pin_led = 25 # default led on the pico could change to a different led on a pin if wanted eg for external housing
 
@@ -560,7 +561,9 @@ print("Timers initialised.")
 # Lets enable and see if it helps when heater on and we crash
 # So far from simulated tests this seems to work and heater pin is reset
 
-#watchdog = machine.WDT(timeout=(1000 * 3)) 
+if enable_watchdog: 
+    watchdog = machine.WDT(timeout=(1000 * 3)) 
+    print("Watchdog enabled")
 
 
 
@@ -607,8 +610,8 @@ while True:
             buzzer_play_tone(buzzer, 1500, 350)
             #pid.reset()  # Seems to help improve overshoot reduction resetting pid stats once near setpoint from cold
 
-    #watchdog.feed() # maybe have a check somewhere to make sure its ok to feed 
-    
+    if enable_watchdog: watchdog.feed()
+
     # need to check if heater is on and temps not rising to warn user after 10 sec? 
     # eg heater pwm cable could be loose , no power to heater,  thermocouple issue 
     
