@@ -16,7 +16,7 @@ from heaters import HeaterFactory, InductionHeater, ElementHeater
 
 
 #pid_tunings = 0.48, 0.004, 0   #18mm + nichrome 2mm
-pid_tunings = 0.33, 0.0012, 0   #20mm + nichrome 3mm
+pid_tunings = 0.33, 0.0011, 0   #20mm + nichrome 3mm
 
 
 # Limit max_duty_cycle_percent - use this if you need to protect power supply/batteries 
@@ -28,7 +28,7 @@ pid_tunings = 0.33, 0.0012, 0   #20mm + nichrome 3mm
 
 heater_max_duty_cycle_percent = 70  #set to 100 for no limit 
 
-enable_watchdog = True # Turn off when tuning pid as you need to unplug/plug usb cable each time you ctrl+c other wise
+enable_watchdog = False # Turn off when tuning pid as you need to unplug/plug usb cable each time you ctrl+c other wise
 
 hardware_pin_led = 25 # default led on the pico could change to a different led on a pin if wanted eg for external housing
 
