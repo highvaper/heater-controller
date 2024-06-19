@@ -30,7 +30,6 @@ pid_tunings = 0.29, 0.0008, 0   #18mm + nichrome 3mm - 60%
 
 heater_max_duty_cycle_percent = 60  #set to 100 for no limit 
 
-enable_watchdog = True # Turn off when tuning pid as you need to unplug/plug usb cable each time you ctrl+c other wise
 
 hardware_pin_led = 25 # default led on the pico could change to a different led on a pin if wanted eg for external housing
 
@@ -48,7 +47,6 @@ hardware_pin_termocouple_cs = 7
 hardware_pin_termocouple_so = 8
 
 hardware_pin_heater = 22
-
 
 #to kill?
 #import onewire, ds18x20
@@ -254,7 +252,8 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
 
 def buzzer_play_tone(buzzer, frequency, duration):
     buzzer.freq(frequency)
-    buzzer.duty_u16(32768) # 50% duty cycle
+    #buzzer.duty_u16(32768) # 50% duty cycle
+    buzzer.duty_u16(10000) # 
     utime.sleep_ms(duration)
     buzzer.duty_u16(0) # Stop the buzzer
 
@@ -445,6 +444,21 @@ buzzer = PWM(Pin(hardware_pin_buzzer))
 buzzer_play_tone(buzzer, 2500, 200)  # Play a sound so we know its connected correctly
 print("Buzzer initialised.")
 
+
+
+print("Setting watchdog")
+bootsel_pin = Pin(hardware_pin_button, Pin.IN)
+print(bootsel_pin.value())
+if bootsel_pin.value():
+    enable_watchdog = True
+    print("Watchdog: On")
+else:
+    enable_watchdog = False
+    utime.sleep_ms(100)
+    buzzer_play_tone(buzzer, 2500, 250)  # Play a sound so we know its not in watchdog mode
+    utime.sleep_ms(100)
+    buzzer_play_tone(buzzer, 2500, 250)  # Play a sound so we know its not in watchdog mode
+    print("Watchdog: Off")
 
 
 # Maybe put in function reset when options reloaded as they may affect settings
