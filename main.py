@@ -16,7 +16,9 @@ from heaters import HeaterFactory, InductionHeater, ElementHeater
 
 
 #pid_tunings = 0.48, 0.004, 0   #18mm + nichrome 2mm
-pid_tunings = 0.33, 0.0011, 0   #20mm + nichrome 3mm
+pid_tunings = 0.29, 0.0008, 0   #18mm + nichrome 3mm - 60%
+#pid_tunings = 0.33, 0.0011, 0   #20mm + nichrome 3mm - 70%
+
 
 
 # Limit max_duty_cycle_percent - use this if you need to protect power supply/batteries 
@@ -26,9 +28,9 @@ pid_tunings = 0.33, 0.0011, 0   #20mm + nichrome 3mm
 #
 # After changing this the pid tunings may need to be updated
 
-heater_max_duty_cycle_percent = 70  #set to 100 for no limit 
+heater_max_duty_cycle_percent = 60  #set to 100 for no limit 
 
-enable_watchdog = False # Turn off when tuning pid as you need to unplug/plug usb cable each time you ctrl+c other wise
+enable_watchdog = True # Turn off when tuning pid as you need to unplug/plug usb cable each time you ctrl+c other wise
 
 hardware_pin_led = 25 # default led on the pico could change to a different led on a pin if wanted eg for external housing
 
@@ -266,7 +268,7 @@ class SharedState:
         self.session_timeout = 5 * 60 * 1000   # length of time for a session before auto off (5 mins)
         self.temperature_units = 'C'       # Not tested F at all 
 
-        self.setpoint = 180     # Initial PID setpoint 
+        self.setpoint = 200     # Initial PID setpoint 
 
         # When in session mode and we first hist setpoint make led change colour ?  and / or sound a buzzer 
         # When session mode about to end (5 secs?) sound buzzer so user can extens easily -
