@@ -445,21 +445,19 @@ buzzer_play_tone(buzzer, 2500, 200)  # Play a sound so we know its connected cor
 print("Buzzer initialised.")
 
 
-
-print("Setting watchdog")
-bootsel_pin = Pin(hardware_pin_button, Pin.IN)
-print(bootsel_pin.value())
-if bootsel_pin.value():
+button_pin = Pin(hardware_pin_button, Pin.IN)
+print(button_pin.value())
+if button_pin.value():
     enable_watchdog = True
     print("Watchdog: On")
 else:
     enable_watchdog = False
-    utime.sleep_ms(100)
-    buzzer_play_tone(buzzer, 2500, 250)  # Play a sound so we know its not in watchdog mode
-    utime.sleep_ms(100)
-    buzzer_play_tone(buzzer, 2500, 250)  # Play a sound so we know its not in watchdog mode
+    utime.sleep_ms(150)
+    buzzer_play_tone(buzzer, 2000, 250)
+    utime.sleep_ms(150)
+    buzzer_play_tone(buzzer, 1000, 250)
     print("Watchdog: Off")
-
+del button_pin
 
 # Maybe put in function reset when options reloaded as they may affect settings
 #Termocouple K type
