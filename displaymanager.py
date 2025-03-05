@@ -100,6 +100,15 @@ class DisplayManager:
         self.display.show()
         utime.sleep_ms(2000) # Wait for 2 seconds to display the first set of messages
 
+    def show_watchdog_off_screen(self):
+        # Clear the display and show the first set of messages
+        self.display.fill(0) 
+
+        self.display.text('Warning',  self.get_centered_text_start_position('Warning'), 0, 1)
+        self.display.text('Watchdog', self.get_centered_text_start_position('Watchdog'), 8, 1)
+        self.display.text('OFF', self.get_centered_text_start_position('OFF'), 16, 1)
+        self.display.show()
+        utime.sleep_ms(2000) # Wait for 2 seconds to display the first set of messages
 
     def show_screen_graph_bar(self):
 
@@ -247,6 +256,108 @@ class DisplayManager:
         self.display.show()
 
 
+    def show_screen_temp_watts_line(self):
+        self.display.fill(0)
+
+        watt_readings = self.shared_state.watt_readings
+        if not watt_readings:
+            self.display.text("No data yet", 0, 0, 1)
+            self.display.show()
+            return
+
+        temperature_readings = self.shared_state.temperature_readings
+        if not temperature_readings:
+            self.display.text("No data yet", 0, 0, 1)
+            self.display.show()
+            return
+
+        min_time = min(watt_readings.keys())
+        max_time = max(watt_readings.keys())
+        x_range = max_time - min_time
+        if x_range == 0: x_range = 1
+
+        x_scale = self.display.width / x_range
+        y_scale = self.shared_state.max_watts / self.display.height
+        for time, watt in watt_readings.items():
+            x = int((time - min_time) * x_scale)
+            y = self.display.height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
+
+            # Draw a single pixel for each watt reading
+            self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
+
+        last_time, last_watt = max(watt_readings.items(), key=lambda item: item[0])
+        last_watts_str = str(last_watt) + "W"
+
+
+        min_time = min(temperature_readings.keys())
+        max_time = max(temperature_readings.keys())
+        x_range = max_time - min_time
+        if x_range == 0: x_range = 1
+
+        x_scale = self.display.width / x_range
+
+        for time, temp in temperature_readings.items():
+            x = int((time - min_time) * x_scale)
+            y = self.display.height - int(temp / 10) # Adjust the y-coordinate to represent each pixel as 10°C
+
+            # Draw a dotted line
+            if(x % 2) == 0:
+                self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
+
+        last_time, last_temp = max(temperature_readings.items(), key=lambda item: item[0])
+        last_temp_str = str(last_temp) + "C"
+
+        # Draw dotted setpoint line
+        setpoint_y = self.display.height - int(self.shared_state.setpoint / 10) # Calculate the y-coordinate for the checkpoint
+        dot_spacing = 4 # Adjust this value to change the spacing between dots
+        for x in range(0, self.display.width, dot_spacing):
+            self.display.pixel(x, setpoint_y, 1) 
+            
+        t = last_temp_str + " " + last_watts_str
+        self.display.text(t, 0, 0, 1)
+
+        self.display.show()
+        
+
+    def show_screen_watts_line(self):
+        self.display.fill(0)
+
+        watt_readings = self.shared_state.watt_readings
+        if not watt_readings:
+            self.display.text("No data yet", 0, 0, 1)
+            self.display.show()
+            return
+
+        min_time = min(watt_readings.keys())
+        max_time = max(watt_readings.keys())
+        x_range = max_time - min_time
+        if x_range == 0: x_range = 1
+
+        x_scale = self.display.width / x_range
+        y_scale = self.shared_state.max_watts / self.display.height
+        for time, watt in watt_readings.items():
+            x = int((time - min_time) * x_scale)
+            y = self.display.height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
+
+            # Draw a single pixel for each watt reading
+            self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
+
+        last_time, last_watt = max(watt_readings.items(), key=lambda item: item[0])
+        last_watts_str = str(last_watt) + "W"
+
+        # Draw dotted setpoint line
+#        setpoint_y = self.display.height - int(self.shared_state.setpoint / 10) # Calculate the y-coordinate for the checkpoint
+#       dot_spacing = 4 # Adjust this value to change the spacing between dots
+#        for x in range(0, self.display.width, dot_spacing):
+#            self.display.pixel(x, setpoint_y, 1) 
+            
+        # Display the last watt reading and other information
+        t = last_watts_str
+        self.display.text(t, 0, 0, 1)
+
+        self.display.show()
+        
+        
     def show_screen_pi_temperature(self):
         value = str(self.shared_state.pi_temperature) + "C"
         self.show_standard_screen("PI Temperature",value)
@@ -281,10 +392,10 @@ class DisplayManager:
 
         if heater.is_on():
             t = "H: On"
-            if isinstance(heater, ElementHeater):
-                t = t + " P: " + "{:.2f}".format(heater.get_power())
         else:
             t = "H: Off"
+        if isinstance(heater, ElementHeater):
+            t = t + " P: " + str(shared_state.watts) + "W"
 
         self.display.text(t, 0, 8)
 
@@ -302,7 +413,13 @@ class DisplayManager:
         self.display.text(t, 0, 16)
         
         p, i, d = pid_components
-        t = "{:.1f} {:.2f} {:.2f}".format(p, i, d)
+        if d > 0:
+            t = "{:.1f} {:.2f} {:.2f}".format(p, i, d)
+        else:
+            t = "{:.1f} {:.1f}".format(p, i)
+        if heater.is_on() and isinstance(heater, ElementHeater):
+            t = t + " P: " + "{:.1f}".format(heater.get_power())
+            
         self.display.text(t, 0, 24)
 
 

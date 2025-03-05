@@ -27,9 +27,9 @@ class InputHandler:
 
     def setup_rotary_values(self):
         if self.shared_state.rotary_last_mode != "menu" and self.shared_state.in_menu:
-            self.rotary.set(value=self.shared_state.current_menu_position-1)
-            self.previous_rotary_value = self.shared_state.current_menu_position-1
-            self.rotary.set(min_val=1)
+            self.rotary.set(value=self.shared_state.current_menu_position)
+            self.previous_rotary_value = self.shared_state.current_menu_position
+            self.rotary.set(min_val=0)
             self.rotary.set(max_val=len(self.shared_state.menu_options)-1)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_WRAP)
             self.shared_state.rotary_last_mode = "menu"
@@ -57,6 +57,7 @@ class InputHandler:
         if self.shared_state.in_menu:
             direction = 'up' if self.rotary.value() > self.previous_rotary_value else 'down'
             self.shared_state.rotary_direction = direction
+
         else:
             adjustment_rate = 10 if self.button_pressed else 0
             if self.rotary.value() > self.previous_rotary_value:
@@ -102,7 +103,11 @@ class InputHandler:
     def check_click_count(self, timer):   
         if self.click_counter == 1:
             print('Single click detected')
-            #if self.shared_state.menu_options[self.shared_state.current_menu_position] == "Display Contrast":
+            if not self.shared_state.in_menu and not self.rotary_used:
+                print(str(self.shared_state.session_start_time))
+                if self.shared_state.get_mode() == "Session":
+                    if (self.shared_state.session_timeout - self.shared_state.get_session_mode_duration()) < 60000:
+                        self.shared_state.session_start_time = self.shared_state.session_start_time + 60000
 
         elif self.click_counter == 2:
             print('Double click detected')
