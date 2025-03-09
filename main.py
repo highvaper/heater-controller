@@ -14,6 +14,7 @@ from menusystem import MenuSystem
 
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
+from utils import initialize_display, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error
 
 #pid_tunings = 0.48, 0.004, 0   #18mm + nichrome 2mm
 #pid_tunings = 0.29, 0.0008, 0   #18mm + nichrome 3mm - 60% limit
@@ -27,7 +28,7 @@ from heaters import HeaterFactory, InductionHeater, ElementHeater
 #pid_tunings = 0.28, 0.0008, 0   #new heater + 6 coil + nichrome 4mm approx 0.7 ohms - 25% pwm limit - 47 watts meeasured 
 
 
-pid_tunings = 0.21, 0.002, 0   #new heater + 6 coil + nichrome 4mm approx 0.55 ohms - with 2 x lipo batteries
+pid_tunings = 0.21, 0.002, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 ohms - with 2 x lipo batteries
 
 
 # Limit max_duty_cycle_percent - use this if you need to protect power supply/batteries 
@@ -86,118 +87,7 @@ hardware_pin_heater = 22
 
 # Format:  main_system-error_code
 
-MAIN_ERROR_MESSAGES = {"display-setup":      "Error initializing display, cannout continue",
-                       "heater-too_hot":     "Heater too hot > 300C",
-                       "pi-too_hot":         "PI too hot > 60C"
-}
 
-def load_config(file_path='config.txt'):
-    config = {}
-    try:
-        with open(file_path, 'r') as file:
-            for line in file:
-                if line.strip() and not line.startswith('#'): # Ignore empty lines and comments
-                    key, value = line.strip().split('=')
-                    if key == 'session_timeout':
-                        config['session_timeout'] = int(value) * 1000 # Convert to milliseconds
-                    elif key == 'temperature_units':
-                        config['temperature_units'] = value
-                    elif key == 'setpoint':
-                        config['setpoint'] = int(value)
-                    elif key == 'power_threshold':
-                        config['power_threshold'] = int(value)
-                    elif key == 'heater_on_temperature_difference_threshold':
-                        config['heater_on_temperature_difference_threshold'] = int(value)
-                    # Add more elif statements for other configuration settings
-    except OSError as e:
-        print("Error opening or reading config file:", e)
-    return config
-
-
-def get_pi_temperature_or_handle_error(pi_temperature_sensor):
-    try:
-        ADC_voltage = pi_temperature_sensor.read_u16() * (3.3 / (65536))
-        pi_temperature = 27 - (ADC_voltage - 0.706) / 0.001721
-        return pi_temperature
-    except Exception as e:
-        error_message = str(e)
-        print("Error reading PI temperature: " + error_message)
-        display_manager.display_error("pi-unknown_error", "Error reading PI temperature: " + error_message,10,True) # need to move out of this?
-        #while True:
-         #   utime.sleep_ms(1000)
-    return pi_temperature
-
-def get_thermocouple_temperature_or_handle_error(thermocouple, heater):
-    try:
-
-        if isinstance(heater, InductionHeater):
-            new_temperature, need_off_temperature = thermocouple.get_filtered_temp(heater.is_on())
-        elif isinstance(heater, ElementHeater):
-            new_temperature = thermocouple.read_raw_temp()
-            need_off_temperature = False  # caller can throw this away if not needed
-        else:
-            raise ValueError("Unsupported heater type")
-        return new_temperature, need_off_temperature
-    
-    except ErrorMessage as e:
-        error_message = str(e)
-        error_code = e.error_code
-        if error_code in ["thermocouple-invalid_reading",
-                          "thermocouple-zero_reading", 
-                          "thermocouple-below_zero"]:
-            heater.off()
-            if pidTimer.is_timer_running(): pidTimer.stop() # Maybe stop other timers?
-            print("Stopped heater - [" + error_code + "] " + error_message)
-            while True:
-                display_manager.display_error(error_code, "Stopped heater - " + error_message)  # need to move out of this?
-                utime.sleep_ms(500)
-        else:
-            #thermocouple-above_limit, thermocouple-read_error
-            heater.off()
-            
-            print("Pausing heater - [" + error_code + "] " + error_message)
-            #display_manager.display_error(error_code, "Pausing heater - " + error_message,10,True)  # need to move out of this?
-                                                                                                 
-
-            return -1, True
-    
-    except Exception as e:
-        # Handle or log unexpected exceptions not dealt with above
-        error_message = str(e)
-        heater.off()
-        if pidTimer.is_timer_running(): pidTimer.stop() 
-        print("Stopped heater - Unknown Error: " + error_message)
-        while True:
-            display_manager.display_error("unknown_error","Stopped heater - Unknown Error: " + error_message)
-            utime.sleep_ms(500)
-
-def initialize_display(i2c_scl, i2c_sda, led_pin):
- 
-    try:
-        i2c = I2C(0, scl=Pin(i2c_scl), sda=Pin(i2c_sda), freq=200000)
-        display = SSD1306_I2C(128, 32, i2c)
-    except Exception as e:
-        error_text = "Start up failed - [display-setup] " + MAIN_ERROR_MESSAGES["display-setup"] + " " + str(e)
-        print(error_text)
-        while True:
-            # We could so a special lookup for each error type for the display and morse code it out?
-            # For time being 3 on/off in short time with a pause and then repeating is enough to notify 
-            # about a display issue
-            led_pin.on()
-            utime.sleep_ms(200)
-            led_pin.off()
-            utime.sleep_ms(200)
-            led_pin.on()
-            utime.sleep_ms(200)
-            led_pin.off()
-            utime.sleep_ms(200)
-            led_pin.on()
-            utime.sleep_ms(200)
-            led_pin.off()
-            utime.sleep_ms(1000)
-        sys.exit()
-
-    return display
 
 
 
@@ -212,7 +102,7 @@ def timerSetPiTemp(t):
             if not pidTimer.is_timer_running: pidTimer.stop() 
             heater.off()
             while not shared_state.pi_temperature <= shared_state.pi_temperature_limit:
-                display_manager.display_error("pi-too_hot", MAIN_ERROR_MESSAGES["pi-too_hot"] + " " + str(pi_temperature) + "C", 5) # Move display out of here?
+                display_manager.display_error("pi-too_hot", 5) # Move display out of here?
                 
                 shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor)
                 utime.sleep_ms(250)  # Warning shown for 5 secs so has had a time to cool down a bit
@@ -225,6 +115,18 @@ def timerSetPiTemp(t):
     else:
         if not pidTimer.is_timer_running: pidTimer.start()
 
+def get_input_volts():
+    adc_pin = machine.ADC(28) 
+    r1 = 100000  # 100kΩ
+    r2 = 10000   # 10kΩ
+    adc_value = adc_pin.read_u16()
+    voltage_adc = adc_value * (3.3 / 65535)  # Convert ADC value to voltage
+    voltage_in = voltage_adc * (r1 + r2) / r2 #calculate input voltage
+    #voltage_in -= 0.220 #correction after comparing to voltmeter for 3.7v
+    #need to make table to adjust amount depending on input voltage and comparing to voltmeter as it gets less as voltage measured increases
+    #print("Input Voltage:", voltage_in, "V")
+    return round(voltage_in, 2)
+    
 
 def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termocouple function 
                                  #this needs a major clear up now we have share_state 
@@ -232,7 +134,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
 
     if pid.setpoint != shared_state.setpoint: pid.setpoint = shared_state.setpoint
     
-    new_heater_temperature, need_heater_off_temperature = get_thermocouple_temperature_or_handle_error(thermocouple, heater)
+    new_heater_temperature, need_heater_off_temperature = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager)
 
     if new_heater_temperature < 0: # Non fatal error occured 
         heater.off() #should already be off
@@ -241,11 +143,14 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     # new temperature is valid
     shared_state.heater_temperature = new_heater_temperature
     
+    new_input_volts = get_input_volts()
+    shared_state.input_volts = new_input_volts
+    
     if need_heater_off_temperature:
         heater.off()
         print("Getting safe off heater temperature")
         utime.sleep_ms(301) # lets give everything a moment to calm down
-        new_heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater)
+        new_heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager)
         if new_heater_temperature < 0: # Non fatal error occured 
             return   # Let timer run this again and hopefully next time error has passed
         # new off temperature is valid
@@ -255,6 +160,15 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         oldest_time = min(shared_state.temperature_readings.keys())
         del shared_state.temperature_readings[oldest_time]
     shared_state.temperature_readings[utime.ticks_ms()] = int(shared_state.heater_temperature)
+
+    if len(shared_state.input_volts_readings) >= 128: 
+        oldest_time = min(shared_state.input_volts_readings.keys())
+        del shared_state.input_volts_readings[oldest_time]
+    shared_state.input_volts_readings[utime.ticks_ms()] = shared_state.input_volts
+
+    #shared_state.heater_max_duty_cycle_percent - need to update this now and adjust to MAX WATTS (add to shared state)
+    #ie = (MAX_WATTS / (v * v / r))  * 100  
+    #if > 100 then set to 100.
 
     if len(shared_state.watt_readings) >= 128: 
         oldest_time = min(shared_state.watt_readings.keys())
@@ -274,13 +188,36 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         heater.off()
         return
     
+    if shared_state.power_type == 'lipo':
+        if (shared_state.input_volts / shared_state.lipo_count) < shared_state.lipo_safe_volts:
+            heater.off()
+            shared_state.set_mode("Off")
+            display_manager.display_error("battery_level-too-low",10,True)    
+    elif shared_state.power_type == 'lead':
+        if (shared_state.input_volts  < shared_state.lead_safe_volts):
+            heater.off()
+            shared_state.set_mode("Off")
+            display_manager.display_error("battery_level-too-low",10,True)    
+    elif shared_state.power_type == 'mains':
+        #mains powered 
+        #need to add in to below test the shared_state.heater_max_duty_cycle_percent and get watts and limit to 100?
+        if shared_state.input_volts > 15.0:
+            heater.off()
+            shared_state.set_mode("Off")
+            display_manager.display_error("mains-voltage-too-high",10,True)    #update error for dutycyle/watts instead 
+    else:
+        heater.off()
+        shared_state.set_mode("Off")
+        display_manager.display_error("unknown-power-type",10,True)    
+   
+        
     if power > shared_state.power_threshold:
         if abs(shared_state.heater_temperature) > 350:  # Hard coded limit if user really wants to up this then up to them to edit code
             if heater.is_on():
                 heater.off()
-            error_text = "Pausing heater - " + MAIN_ERROR_MESSAGES["heater-too_hot"] + " " + str(shared_state.heater_temperature)
+            error_text = "Pausing heater - " + shared_state.error_messages["heater-too_hot"] + " " + str(shared_state.heater_temperature)
             print(error_text)
-            display_manager.display_error("heater-too_hot",error_text,10,True)
+            display_manager.display_error("heater-too_hot",10,True)
         elif not heater.is_on():
             if shared_state.get_mode() != "Off":
                 heater.on(power)
@@ -290,16 +227,10 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         if heater.is_on():
             heater.off()  #Maybe we call this no matter what just in case?
     
-    t = ','.join(map(str, [pid._last_time, shared_state.heater_temperature, thermocouple.raw_temp, pid.setpoint, power, heater.is_on(), pid.components]))
+ #   t = ','.join(map(str, [pid._last_time, shared_state.heater_temperature, thermocouple.raw_temp, pid.setpoint, power, heater.is_on(), pid.components]))
  #   print(t)
 
-def buzzer_play_tone(buzzer, frequency, duration):
-    #need to do this as a separate thread as this blocks
-    buzzer.freq(frequency)
-    #buzzer.duty_u16(32768) # 50% duty cycle
-    buzzer.duty_u16(10000) # 
-    utime.sleep_ms(duration)
-    buzzer.duty_u16(0) # Stop the buzzer
+
 
 
 class SharedState:
@@ -308,13 +239,23 @@ class SharedState:
         # All of the below hard coded can be loaded from a file or similar 
         # Need to add other stuff like butto click time, max temp, etc
 
-        self.heater_max_duty_cycle_percent = 40
-        self.input_volts = 12 # to be updated from voltage divider curcuit on adc pin - need to check on lipos nder load that they dont go below about 3.2v (* number of batteries as we arent testing each one and need to assume all battereis are of same age/quality/internal resitance)
+        #If more of these are added need to update line count in intputhandler for displing them
 
-        self.heater_resitance = 0.66  #this should not change unless coils is replaced user needs to provide this value
+        self.heater_max_duty_cycle_percent = 95
+        #self.heater_max_duty_cycle_percent = 95
 
-        #self.max_watts = (self.input_volts * self.input_volts) / self.heater_resitance # needs to be initial volts?
-        self.max_watts = 120
+        self.input_volts = 0
+        
+        self.power_type = 'mains'
+        #self.power_type = 'lipo'  #'mains', 'lipo', 'lead'
+        self.lipo_count = 2
+        self.lipo_safe_volts = 3.2
+        self.lead_safe_volts = 12.0 
+
+        self.heater_resitance = 0.6  #this should not change unless coils is replaced user needs to provide this value
+
+
+        self.initial_max_watts = 0 #for watts graph y axis
         
         self.session_timeout = 5 * 60 * 1000   # length of time for a session before auto off (5 mins)
         self.temperature_units = 'C'       # Not tested F at all 
@@ -351,7 +292,11 @@ class SharedState:
         self.temperature_readings =  {}
         self.heater_temperature = 0  # Overal induction heater temperature from thermocouple at the moment only deals with one 
                                      # possibly extend to deal with multpile but not to start with
-                                     
+
+        #shared_state.update_input_volts() #todo
+        self.input_volts_readings = {}
+        self.input_volts = 0
+        
         self.watt_readings = {}
         self.watts = 0
         
@@ -368,7 +313,7 @@ class SharedState:
                              "Graph Bar",
                              "Temp Watts Line",
                              "Watts Line",
-                             "PI Temperature",
+                             "Show Settings",
                              "Display Contrast"
                             ]
                             # Battery/power info screen  - can we get volts & amps? and move to where pid is on home? + level 
@@ -379,19 +324,28 @@ class SharedState:
                             # Get varuous settings for elements in config file as may need to limit highest temp coil can get not to burn insulation PTFE 
                             # ie despite pid/thermocouple - so tcr? or just limit wattage on known values for wire type/length/ohms so it doesnt get too hot 
  
-        self.in_menu = False  # need to add get/set fnctions? 
-        self.current_menu_position = 0 # need to add get/set functions? - dont let get more than one or count of options -1
+        self.in_menu = False   
+        self.current_menu_position = 0 
         self.menu_selection_pending = False 
         self.menu_timeout = 3 * 1000   # 3 secs
         
         self.rotary_direction = None
         self.rotary_last_mode = None
 
+        self.show_settings_line = 0
+        
         self.session_start_time = 0
         self.session_setpoint_reached = False
         self.session_reset_pid_when_near_setpoint = True # Seems to help improve overshoot reduction by resetting pid stats once near setpoint from cold
         self._mode = "Off" 
 
+        self.error_messages = {"display-setup":      "Error initializing display, cannout continue",
+                       "heater-too_hot":     "Heater too hot > 300C",
+                       "battery_level-too-low": "Battery too low",
+                       "unknown-power-type": "Unknwon power type",
+                       "mains-voltage-too-high": "Mains voltage too high",
+                       "pi-too_hot":         "PI too hot > 60C"
+}
 
     def get_mode(self):
         if self._mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
@@ -468,7 +422,7 @@ except Exception as e:
 
 
 print("Display Initialising ...")
-display = initialize_display(hardware_pin_display_scl, hardware_pin_display_sda, led_pin)  # Move to HARDWARE.conf ?
+display = initialize_display(hardware_pin_display_scl, hardware_pin_display_sda, led_pin)
 print("Display initialised.")
 
 shared_state = SharedState()
@@ -482,7 +436,7 @@ try:
     display_manager = DisplayManager(display, shared_state)
     display_manager.show_startup_screen()
 except Exception as e:
-    error_text = "Start up failed - [display-setup] " + MAIN_ERROR_MESSAGES["display-setup"] + " " + str(e)
+    error_text = "Start up failed - [display-setup] " + shared_state.error_messages["display-setup"] + " " + str(e)
     print(error_text + " " + str(e))
     display.fill(0)
     display.text(error_text, 0, 0)
@@ -533,7 +487,7 @@ except Exception as e:
     error_text = "Start up failed: " + str(e)
     print(error_text)
     while True:
-        display_manager.display_error("thermocouple-setup",str(error_text))
+        display_manager.display_error("thermocouple-setup")
         utime.sleep_ms(100)
     sys.exit() #?
 
@@ -596,6 +550,18 @@ print(pid.tunings)
 
 
 
+shared_state.input_volts = get_input_volts()
+
+#initial_max_watts - needed for watts graphs y scale - not used for anything limiting etc
+#Assuming mains voltage remains constant 
+#Assuming batteries only go down in charge 
+if shared_state.initial_max_watts == 0:
+    #if > 0 assume user has set this themselves
+    shared_state.initial_max_watts = (shared_state.input_volts * shared_state.input_volts) / shared_state.heater_resitance 
+
+#lets do some sanity checks on power level 
+#warn user if high but still not ridiculous
+#reduce if too high to more sensible level
 
 # InductionHeater
 
@@ -612,7 +578,7 @@ heater.off()
 
 
 pidTimer = CustomTimer(371, machine.Timer.PERIODIC, timerUpdatePIDandHeater)  # need to have timer setup before calling below 
-shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater)
+shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager)
 
 print("Timers Initialising ...")
 pidTimer.start()

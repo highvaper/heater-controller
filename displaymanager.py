@@ -47,25 +47,17 @@ class DisplayManager:
             self.display.invert(False)
 
 
-    def display_error(self, code, message, duration=5, show_countdown=False):
+    def display_error(self, message, duration=5, show_countdown=False):
         message_length = len(message) * 8 # Assuming each character is 8 pixels wide
         start_time = utime.ticks_ms()
         scroll_speed = 20 # Time in milliseconds to wait before moving to the next character
         message_scroll_position = 0
-        code_scroll_position = 0 # Start fully visible on the left
         message_display_time = (message_length + (128*8)) * scroll_speed # Total time to display the message
-        code_scroll_direction = -1 # Start moving to the left
 
         while utime.ticks_diff(utime.ticks_ms(), start_time) < message_display_time:
             self.display.fill(0) # Clear the display
 
-            # Scrolling logic for the code
-            self.display.text(code, code_scroll_position, 0, 1)
-            code_scroll_position += code_scroll_direction
-            if code_scroll_position < -len(code) * 8 - 8 or code_scroll_position > 128: # Adjusted to account for the additional space
-                code_scroll_direction *= -1
-                code_scroll_position = 128 if code_scroll_position < -len(code) * 8 - 8 else 0 # Adjusted to scroll back to the start
-
+      
             # Scrolling logic for the message
             self.display.text(message, message_scroll_position, 12, 1)
             message_scroll_position -= 1
@@ -277,7 +269,7 @@ class DisplayManager:
         if x_range == 0: x_range = 1
 
         x_scale = self.display.width / x_range
-        y_scale = self.shared_state.max_watts / self.display.height
+        y_scale = self.shared_state.initial_max_watts / self.display.height
         for time, watt in watt_readings.items():
             x = int((time - min_time) * x_scale)
             y = self.display.height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
@@ -334,7 +326,7 @@ class DisplayManager:
         if x_range == 0: x_range = 1
 
         x_scale = self.display.width / x_range
-        y_scale = self.shared_state.max_watts / self.display.height
+        y_scale = self.shared_state.initial_max_watts / self.display.height
         for time, watt in watt_readings.items():
             x = int((time - min_time) * x_scale)
             y = self.display.height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
@@ -357,10 +349,6 @@ class DisplayManager:
 
         self.display.show()
         
-        
-    def show_screen_pi_temperature(self):
-        value = str(self.shared_state.pi_temperature) + "C"
-        self.show_standard_screen("PI Temperature",value)
 
     def show_screen_display_contrast(self):
         self.display.contrast(self.shared_state.display_contrast)  # Set contast to current value
@@ -390,10 +378,12 @@ class DisplayManager:
             t = "T: " + str(int(shared_state.heater_temperature)) + "C (" + str(int(shared_state.setpoint)) + "C)"
         self.display.text(t, 0, 0)
 
-        if heater.is_on():
-            t = "H: On"
-        else:
-            t = "H: Off"
+        #if heater.is_on():
+        #    #t = "H: On"
+        #else:
+        #    t = "H: Off"
+        #t = "V: " + str(shared_state.input_volts) + "V"
+        t = "V: " + "{:.1f}".format(shared_state.input_volts) + "V"
         if isinstance(heater, ElementHeater):
             t = t + " P: " + str(shared_state.watts) + "W"
 
@@ -422,6 +412,52 @@ class DisplayManager:
             
         self.display.text(t, 0, 24)
 
+    def show_screen_show_settings(self):
+        self.display.fill(0)
+        
+        exclude_vars = {'temperature_readings','input_volts_readings','watt_readings','menu_options','error_messages'}  
+        vars_dict = {k: v for k, v in self.shared_state.__dict__.items() if k not in exclude_vars}        
+        vars_dict = dict(vars_dict.items())
+        
+        items_list = list(vars_dict.items())
+        items_list = sorted(items_list, key=lambda x: x[0])
+        if self.shared_state.show_settings_line < len(items_list):
+            current_item = items_list[self.shared_state.show_settings_line]
+            var_name, value = current_item
+        else:
+            var_name = "End"
+            value = self.shared_state.show_settings_line
+            #self.shared_state.show_settings_line = 0 #reset
+
+        display_text = f"{var_name}: {value}"
+
+        # Calculate text dimensions
+        max_lines = 4    # Screen can show 4 lines
+        chars_per_line = 16  # Characters that fit per line (128/8)
+        
+        # Split text into lines
+        words = display_text.split()
+        lines = []
+        current_line = ""
+            
+        # Build lines word by word
+        for word in words:
+            if len(current_line) + len(word) + 1 <= chars_per_line:
+                current_line += " " + word if current_line else word
+            else:
+                lines.append(current_line)
+                current_line = word
+                if len(lines) >= max_lines:
+                    break
+        
+        if current_line and len(lines) < max_lines:
+            lines.append(current_line)        
+
+        for i, line in enumerate(lines):
+            if i < max_lines:
+                self.display.text(line, 0, i * 8, 1)
+
+        self.display.show()
 
 
     def show_screen_menu(self):

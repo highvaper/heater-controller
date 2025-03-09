@@ -42,6 +42,16 @@ class InputHandler:
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Display Contrast"
             print("setup rotarty contrast" + str(self.rotary.value()))
+
+        elif self.shared_state.rotary_last_mode != "Show Settings" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Show Settings":
+            self.rotary.set(value=self.shared_state.show_settings_line)
+            self.previous_rotary_value = self.shared_state.show_settings_line
+            self.rotary.set(min_val=0)
+            self.rotary.set(max_val=35) #change to count of settings 
+            self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
+            self.shared_state.rotary_last_mode = "Show Settings"
+            print("setup rotarty show settings" + str(self.rotary.value()))
+
         else:
             if self.shared_state.rotary_last_mode != "setpoint":
                 self.rotary.set(value=self.shared_state.setpoint)
@@ -67,6 +77,8 @@ class InputHandler:
             
             if self.shared_state.menu_options[self.shared_state.current_menu_position] == "Display Contrast":
                 self.shared_state.display_contrast = self.rotary.value()
+            elif self.shared_state.menu_options[self.shared_state.current_menu_position] == "Show Settings":
+                self.shared_state.show_settings_line = self.rotary.value()
             else:
                 self.shared_state.setpoint = self.rotary.value()
 
