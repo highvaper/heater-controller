@@ -28,18 +28,8 @@ from utils import initialize_display, buzzer_play_tone, get_thermocouple_tempera
 #pid_tunings = 0.28, 0.0008, 0   #new heater + 6 coil + nichrome 4mm approx 0.7 ohms - 25% pwm limit - 47 watts meeasured 
 
 
-pid_tunings = 0.21, 0.002, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 ohms - with 2 x lipo batteries
+pid_tunings = 0.23, 0.003, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 ohms - with 2 x lipo batteries
 
-
-# Limit max_duty_cycle_percent - use this if you need to protect power supply/batteries 
-# eg: max power supply watts: 120W - 12v @ 10A Max
-#     If we know the element will pull 200W (from resitance of it and supply voltage)
-#     need to limit pwm cyle to 120/200 * 100 = 60% 
-#
-# After changing this the pid tunings may need to be updated
-
-#heater_max_duty_cycle_percent = 55  #set to 100 for no limit  
-#moved to shaed sate
 
 #add option for PWM mode so dial sets duty %  and ignore pid/temp (up to 300?) and just go in manual mode - show watts as we can work it out
 
@@ -54,6 +44,8 @@ pid_tunings = 0.21, 0.002, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 oh
 #Note if we can get input voltage for coil then we can possibly set some sensible default for heater_max_duty_cycle_percent
 #also choose the correct profile automatically - ie know its battery or mains - get user to confirm  
 # - ie to then enable/diable battery check and also et preset pid values for each battery setup type or mains from profile
+
+
 #add new graphs:
 # voltage over time 
 # watts over time - should be able to work this out if we get the resitance as a constant and know the voltage - if we know the duty cylcle we should be able to work out the watts 
@@ -61,9 +53,10 @@ pid_tunings = 0.21, 0.002, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 oh
 
 #quick heat function - if watts not too high maybe allow boost to speed up intial heat from cold (and temp under 100) and use up to 100W for 10-15 secs?
 
-#if adding new button add maybe if in session and down to under 1 min if press it adds a minute/extra time to session.
 
-hardware_pin_led = 25 #machine.Pin # default led on the pico could change to a different led on a pin if wanted eg for external housing
+hardware_pin_red_led = 17   # inicate heater (manal or session) is activated 
+hardware_pin_green_led = 18 # indicate within 10C of setemp in session mode
+hardware_pin_blue_led = 19  # use to indicate in watts mode / flash a few times whenapproaching last 10 sec of session?
 
 hardware_pin_display_scl = 21
 hardware_pin_display_sda = 20
@@ -72,7 +65,11 @@ hardware_pin_buzzer = 16
 
 hardware_pin_rotary_clk = 13
 hardware_pin_rotary_dt = 12
-hardware_pin_button = 14  #can also be a separate button as well as rotary push/sw pin - just wire both switches to pin and ground
+hardware_pin_button = 14  #can also be a separate button as well as rotary push/sw pin 
+
+hardware_pin_switch_left = 23    #down 
+hardware_pin_switch_middle = 24  #select  - on boot hold to disable watchdog
+hardware_pin_switch_right = 25   #up
 
 hardware_pin_termocouple_sck = 6
 hardware_pin_termocouple_cs = 7 
@@ -80,12 +77,9 @@ hardware_pin_termocouple_so = 8
 
 hardware_pin_heater = 22
 
-# need to add two pins for buttons for up/down left/right so we can do navigation/changes without rotary dial if wanted (use rotary switch as fire/ok still pin 14)
 
 
 ####################################
-
-# Format:  main_system-error_code
 
 
 
@@ -115,17 +109,37 @@ def timerSetPiTemp(t):
     else:
         if not pidTimer.is_timer_running: pidTimer.start()
 
-def get_input_volts():
-    adc_pin = machine.ADC(28) 
-    r1 = 100000  # 100kΩ
-    r2 = 10000   # 10kΩ
+def get_input_volts(previous_reading):
+    adc_pin = machine.ADC(28)
+    r1 = 910000   # 910kΩ
+    r2 = 102000   # 102kΩ
     adc_value = adc_pin.read_u16()
     voltage_adc = adc_value * (3.3 / 65535)  # Convert ADC value to voltage
     voltage_in = voltage_adc * (r1 + r2) / r2 #calculate input voltage
-    #voltage_in -= 0.220 #correction after comparing to voltmeter for 3.7v
-    #need to make table to adjust amount depending on input voltage and comparing to voltmeter as it gets less as voltage measured increases
+
+    if voltage_in < 4.0:
+        correction = 0.220
+    elif voltage_in < 8.0:
+        correction = 0.180
+    else:
+        correction = 0.140
+        
+    if previous_reading == False: previous_reading = voltage_in  # for first reading
+    
+    if previous_reading - (voltage_in - correction) > 1:  
+        #its ok if it goes up we care more about max_duty cycle being too high
+        #this is to cover the adc bug with the rp2040
+        #maybe need to loop a few times and get average rather than just one reading as this still give od rreading sometimes
+        
+        #print("Retry Read Input Voltage:", voltage_in, "V")
+        utime.sleep_ms(100)
+        adc_value = adc_pin.read_u16()
+        voltage_adc = adc_value * (3.3 / 65535)  # Convert ADC value to voltage
+        voltage_in = voltage_adc * (r1 + r2) / r2 #calculate input voltage
+        #assume there really has been a change in voltage and not an error
+    
     #print("Input Voltage:", voltage_in, "V")
-    return round(voltage_in, 2)
+    return round(voltage_in - correction, 2)
     
 
 def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termocouple function 
@@ -143,8 +157,14 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     # new temperature is valid
     shared_state.heater_temperature = new_heater_temperature
     
-    new_input_volts = get_input_volts()
-    shared_state.input_volts = new_input_volts
+    shared_state.input_volts = get_input_volts(shared_state.input_volts)
+
+    #shared_state.heater_max_duty_cycle_percent - need to update this now and adjust to MAX WATTS (add to shared state)
+    
+    shared_state.heater_max_duty_cycle_percent = (shared_state.max_watts / (shared_state.input_volts * shared_state.input_volts / shared_state.heater_resitance)) * 100  
+    if shared_state.heater_max_duty_cycle_percent > 100:
+        shared_state.heater_max_duty_cycle_percent = 100
+    heater.set_max_duty_cycle(shared_state.heater_max_duty_cycle_percent)
     
     if need_heater_off_temperature:
         heater.off()
@@ -166,9 +186,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         del shared_state.input_volts_readings[oldest_time]
     shared_state.input_volts_readings[utime.ticks_ms()] = shared_state.input_volts
 
-    #shared_state.heater_max_duty_cycle_percent - need to update this now and adjust to MAX WATTS (add to shared state)
-    #ie = (MAX_WATTS / (v * v / r))  * 100  
-    #if > 100 then set to 100.
+
 
     if len(shared_state.watt_readings) >= 128: 
         oldest_time = min(shared_state.watt_readings.keys())
@@ -241,22 +259,22 @@ class SharedState:
 
         #If more of these are added need to update line count in intputhandler for displing them
 
-        self.heater_max_duty_cycle_percent = 95
-        #self.heater_max_duty_cycle_percent = 95
-
-        self.input_volts = 0
         
         self.power_type = 'mains'
         #self.power_type = 'lipo'  #'mains', 'lipo', 'lead'
-        self.lipo_count = 2
-        self.lipo_safe_volts = 3.2
+        self.lipo_count = 3
+        self.lipo_safe_volts = 3.1
         self.lead_safe_volts = 12.0 
 
-        self.heater_resitance = 0.6  #this should not change unless coils is replaced user needs to provide this value
+        self.heater_resitance = 0.62  #this should not change unless coils is replaced user needs to provide this value
 
+        self.max_watts = 100 #constant - to use to now adjust heater_max_duty_cycle_percent around based on input volt and resitance
 
-        self.initial_max_watts = 0 #for watts graph y axis
-        
+        self.heater_max_duty_cycle_percent = 0
+        #self.heater_max_duty_cycle_percent = 100
+
+        self.input_volts = 0
+       
         self.session_timeout = 5 * 60 * 1000   # length of time for a session before auto off (5 mins)
         self.temperature_units = 'C'       # Not tested F at all 
         
@@ -279,7 +297,7 @@ class SharedState:
         # dont set this too low 
         self.heater_on_temperature_difference_threshold = 20 
 
-        self.display_contrast = 255   # allow change by option in menu
+        self.display_contrast = 255
         self.display_rotate = True
         
         # Below is stuff perhaps better to leave alone
@@ -350,7 +368,7 @@ class SharedState:
     def get_mode(self):
         if self._mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
             session_start_time = 0
-            led_pin.off()
+            led_green_pin.off()
             self._mode = "Off"  # Set off here rather than after playing sounds as this can get called again while sounds being played
             self.session_setpoint_reached = False
             buzzer_play_tone(buzzer, 1500, 200)
@@ -371,9 +389,9 @@ class SharedState:
         else:
             raise ValueError("Invalid mode. Must be 'Off', 'Session' or 'Manual'")
         if new_mode == "Off":
-            led_pin.off()
+            led_green_pin.off()
         else:
-            led_pin.on()
+            led_green_pin.on()
             pid.reset()
             print("PID Stats reset")
             
@@ -399,18 +417,37 @@ class SharedState:
 #
 ###############################################################
 
-print("LED Initialising ...")
+print("LEDs Initialising ...")
 try:
     #led_pin = Pin(hardware_pin_led, Pin.OUT) #This is the built in pin on the pico
-    led_pin = Pin("LED", Pin.OUT) 
-    led_pin.on()
+    led_red_pin = Pin(hardware_pin_red_led, Pin.OUT) 
+    led_red_pin.on()
     utime.sleep_ms(75)
-    led_pin.off()
+    led_red_pin.off()
     utime.sleep_ms(75)
-    led_pin.on()
+    led_red_pin.on()
     utime.sleep_ms(75)
-    led_pin.off()
-    print("LED initialised.")
+    led_red_pin.off()
+
+    led_green_pin = Pin(hardware_pin_green_led, Pin.OUT) 
+    led_green_pin.on()
+    utime.sleep_ms(75)
+    led_green_pin.off()
+    utime.sleep_ms(75)
+    led_green_pin.on()
+    utime.sleep_ms(75)
+    led_green_pin.off()
+
+    led_blue_pin = Pin(hardware_pin_blue_led, Pin.OUT) 
+    led_blue_pin.on()
+    utime.sleep_ms(75)
+    led_blue_pin.off()
+    utime.sleep_ms(75)
+    led_blue_pin.on()
+    utime.sleep_ms(75)
+    led_blue_pin.off()
+
+    print("LEDs initialised.")
 except Exception as e:
     print("Error initializing LED pin, unable to continue:", e)
     sys.exit()
@@ -422,7 +459,7 @@ except Exception as e:
 
 
 print("Display Initialising ...")
-display = initialize_display(hardware_pin_display_scl, hardware_pin_display_sda, led_pin)
+display = initialize_display(hardware_pin_display_scl, hardware_pin_display_sda, led_red_pin)
 print("Display initialised.")
 
 shared_state = SharedState()
@@ -457,7 +494,8 @@ buzzer_play_tone(buzzer, 2500, 200)  # Play a sound so we know its connected cor
 print("Buzzer initialised.")
 
 
-button_pin = Pin(hardware_pin_button, Pin.IN)
+#button_pin = Pin(hardware_pin_button, Pin.IN)
+button_pin = Pin(hardware_pin_switch_middle, Pin.IN, Pin.PULL_UP)
 print(button_pin.value())
 if button_pin.value():
     enable_watchdog = True
@@ -472,6 +510,18 @@ else:
     display_manager.show_watchdog_off_screen()
     print("Watchdog: Off")
 del button_pin
+
+
+
+#switch_middle = Pin(hardware_pin_switch_middle, Pin.IN, Pin.PULL_UP)
+
+#def switch_middle_pressed(pin):
+#    # Toggle LED when button is pressed
+#    #led.toggle()
+#    led_blue_pin.toggle()
+
+#switch_middle.irq(trigger=Pin.IRQ_FALLING, handler=switch_middle_pressed)
+
 
 # Maybe put in function reset when options reloaded as they may affect settings
 #Termocouple K type
@@ -491,16 +541,8 @@ except Exception as e:
         utime.sleep_ms(100)
     sys.exit() #?
 
-# 1-Wire temperature sensor 
-# can chain more than one together easly so will be useful for >1 coils
-# not needed for the time being - maybe tie each sensor to the heater coil in ih class?
-# planned to be used for monitoring temperature of zvs induction curcuit
-#
-#ds = ds18x20.DS18X20(onewire.OneWire(machine.Pin(17)))
-#roms = ds.scan()
-#print('1-wire found devices:', roms)
-#ds.convert_temp()
-#ds_temperature = ds.read_temp(roms[0])
+
+
 
 # PI Temperature Sensor 
 pi_temperature_sensor = machine.ADC(4)
@@ -549,15 +591,8 @@ print(pid.tunings)
 
 
 
+shared_state.input_volts = get_input_volts(False)
 
-shared_state.input_volts = get_input_volts()
-
-#initial_max_watts - needed for watts graphs y scale - not used for anything limiting etc
-#Assuming mains voltage remains constant 
-#Assuming batteries only go down in charge 
-if shared_state.initial_max_watts == 0:
-    #if > 0 assume user has set this themselves
-    shared_state.initial_max_watts = (shared_state.input_volts * shared_state.input_volts) / shared_state.heater_resitance 
 
 #lets do some sanity checks on power level 
 #warn user if high but still not ridiculous
@@ -568,7 +603,7 @@ if shared_state.initial_max_watts == 0:
 #ihTimer = Timer(-1) # need to replace with CustomTimer 
 #heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
 
-heater = HeaterFactory.create_heater('element', hardware_pin_heater, shared_state.heater_max_duty_cycle_percent)   # changing the limit will mess with PID tuning
+heater = HeaterFactory.create_heater('element', hardware_pin_heater)   # changing the limit will mess with PID tuning
 
 #heater = HeaterFactory.create_heater('element', hardware_pin_heater) # no limit
 #heater = HeaterFactory.create_heater('element', hardware_pin_heater, 100) # no limit
@@ -579,6 +614,7 @@ heater.off()
 
 pidTimer = CustomTimer(371, machine.Timer.PERIODIC, timerUpdatePIDandHeater)  # need to have timer setup before calling below 
 shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager)
+
 
 print("Timers Initialising ...")
 pidTimer.start()
@@ -591,6 +627,7 @@ piTempTimer.start()
 
 
 print("Timers initialised.")
+
 
 
 # start up stuff done
@@ -634,6 +671,7 @@ while True:
             
     else:
         if shared_state.rotary_last_mode != "menu": 
+            shared_state.current_menu_position = 0
             input_handler.setup_rotary_values()
         if shared_state.menu_selection_pending:
             menu_system.handle_menu_selection()                                               
@@ -645,13 +683,18 @@ while True:
         else:
             pass
 
-    
-    if shared_state.get_mode() == "Session" and shared_state.session_setpoint_reached == False:
-         if shared_state.heater_temperature >= (shared_state.setpoint-8):  
-            shared_state.session_setpoint_reached = True
-            buzzer_play_tone(buzzer, 1500, 350)
-            if shared_state.session_reset_pid_when_near_setpoint:
-                pid.reset()
+    if shared_state.heater_temperature >= (shared_state.setpoint-8) and shared_state.heater_temperature <= (shared_state.setpoint+8):
+        led_red_pin.on()
+    else:
+        led_red_pin.off()
+
+    if shared_state.get_mode() == "Session":
+        if shared_state.session_setpoint_reached == False:
+             if shared_state.heater_temperature >= (shared_state.setpoint-8):  
+                shared_state.session_setpoint_reached = True
+                buzzer_play_tone(buzzer, 1500, 350)
+                if shared_state.session_reset_pid_when_near_setpoint:
+                    pid.reset()
 
     if enable_watchdog: watchdog.feed()
 

@@ -82,7 +82,7 @@ class InductionHeater(BaseHeater):
 
 
 class ElementHeater(BaseHeater): 
-    def __init__(self, element_pin, max_duty_cycle_percent=100):
+    def __init__(self, element_pin):
         super().__init__() 
         print("ElementHeater Initialising ...")
         self.element = Pin(element_pin, Pin.OUT)
@@ -90,8 +90,8 @@ class ElementHeater(BaseHeater):
         self.pwm.freq(16) # Maybe too much? need to see how this goes with nichrome
         self.pwm.duty_u16(0) # Initialize PWM duty cycle to 0 (off)
         self._power = 0
-        self.max_duty_cycle_percent = max_duty_cycle_percent
-        self.max_duty_cycle = int(65535 * (max_duty_cycle_percent / 100)) 
+        self.max_duty_cycle_percent = 0
+        self.max_duty_cycle = 0
         print("ElementHeater initialised.")
 
     def on(self, power=10): # Default to full power
@@ -104,6 +104,9 @@ class ElementHeater(BaseHeater):
     def off(self):
         self.pwm.duty_u16(0) # Set PWM duty cycle to 0 (off)
         self._is_on = False
+
+    def set_max_duty_cycle(self, max_duty_cycle_percent):
+        self.max_duty_cycle = int(65535 * (max_duty_cycle_percent / 100)) 
 
     def set_power(self, power):
         duty_cycle = int(power * 6553.5) 

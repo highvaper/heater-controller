@@ -85,10 +85,10 @@ class DisplayManager:
         # Clear the display and show the first set of messages
         self.display.fill(0) 
 
-        self.display.text('Pi Pico',  self.get_centered_text_start_position('Pi Pico'), 0, 1)
+        self.display.text('MicroPython',  self.get_centered_text_start_position('MicroPython'), 0, 1)
         self.display.text('Heater', self.get_centered_text_start_position('Heater'), 8, 1)
         self.display.text('Controller', self.get_centered_text_start_position('Controller'), 16, 1)
-        self.display.text('v0.1', self.get_centered_text_start_position('v0.1'), 24, 1)
+        self.display.text('', self.get_centered_text_start_position(''), 24, 1)
         self.display.show()
         utime.sleep_ms(2000) # Wait for 2 seconds to display the first set of messages
 
@@ -269,7 +269,7 @@ class DisplayManager:
         if x_range == 0: x_range = 1
 
         x_scale = self.display.width / x_range
-        y_scale = self.shared_state.initial_max_watts / self.display.height
+        y_scale = self.shared_state.max_watts / self.display.height
         for time, watt in watt_readings.items():
             x = int((time - min_time) * x_scale)
             y = self.display.height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
@@ -326,7 +326,7 @@ class DisplayManager:
         if x_range == 0: x_range = 1
 
         x_scale = self.display.width / x_range
-        y_scale = self.shared_state.initial_max_watts / self.display.height
+        y_scale = self.shared_state.max_watts / self.display.height
         for time, watt in watt_readings.items():
             x = int((time - min_time) * x_scale)
             y = self.display.height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
