@@ -110,7 +110,7 @@ class InputHandler:
                 self.button_pressed = False
                 if not self.shared_state.in_menu and self.shared_state.get_mode() == 'Manual':
                     self.shared_state.set_mode("Off")
-                    print("Switching to Off mode")
+                    #print("Switching to Off mode")
 
     def check_click_count(self, timer):   
         if self.click_counter == 1:
@@ -127,7 +127,7 @@ class InputHandler:
                 self.shared_state.in_menu = True
                 self.shared_state.rotary_direction = 'up' # Just Fake it and go to top of menu to force screen refresh
             else:
-                print('Ignoring double click already in menu')
+                #print('Ignoring double click already in menu')
                 
         elif self.click_counter == 3:
             print('Triple click detected')

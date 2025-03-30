@@ -114,9 +114,13 @@ def get_input_volts(previous_reading):
     r1 = 910000   # 910kΩ
     r2 = 102000   # 102kΩ
     adc_value = adc_pin.read_u16()
+ 
+    if adc_value in [512, 1536, 2560, 3584]:  #problematic_values for rp2040 adc reading
+        return previous_reading
+
     voltage_adc = adc_value * (3.3 / 65535)  # Convert ADC value to voltage
     voltage_in = voltage_adc * (r1 + r2) / r2 #calculate input voltage
-
+     
     if voltage_in < 4.0:
         correction = 0.220
     elif voltage_in < 8.0:
@@ -132,7 +136,7 @@ def get_input_volts(previous_reading):
         #maybe need to loop a few times and get average rather than just one reading as this still give od rreading sometimes
         
         #print("Retry Read Input Voltage:", voltage_in, "V")
-        utime.sleep_ms(100)
+        utime.sleep_ms(150)
         adc_value = adc_pin.read_u16()
         voltage_adc = adc_value * (3.3 / 65535)  # Convert ADC value to voltage
         voltage_in = voltage_adc * (r1 + r2) / r2 #calculate input voltage
@@ -262,18 +266,17 @@ class SharedState:
         
         self.power_type = 'mains'
         #self.power_type = 'lipo'  #'mains', 'lipo', 'lead'
-        self.lipo_count = 3
+        self.lipo_count = 4
         self.lipo_safe_volts = 3.1
         self.lead_safe_volts = 12.0 
 
         self.heater_resitance = 0.62  #this should not change unless coils is replaced user needs to provide this value
 
-        self.max_watts = 100 #constant - to use to now adjust heater_max_duty_cycle_percent around based on input volt and resitance
+        self.max_watts = 100 #130w for 0.6 ohm nichrome coil is about max before it starts to glow
 
-        self.heater_max_duty_cycle_percent = 0
-        #self.heater_max_duty_cycle_percent = 100
+        self.heater_max_duty_cycle_percent = 0 #this now gets adjusted automatically based on max_watts / watt level
 
-        self.input_volts = 0
+        self.input_volts = False  # Needs to be False at startup
        
         self.session_timeout = 5 * 60 * 1000   # length of time for a session before auto off (5 mins)
         self.temperature_units = 'C'       # Not tested F at all 
@@ -590,9 +593,9 @@ print(pid.tunings)
 #pid.proportional_on_measurement = True   #Seems to be a bit odd
 
 
-
-shared_state.input_volts = get_input_volts(False)
-
+while shared_state.input_volts is False:
+    shared_state.input_volts = get_input_volts(False)
+    utime.sleep_ms(50)
 
 #lets do some sanity checks on power level 
 #warn user if high but still not ridiculous
