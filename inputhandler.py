@@ -96,6 +96,7 @@ class InputHandler:
                     self.click_counter += 1
                 else:
                     self.click_counter = 1 # Reset the counter if the time since last press is more than 750ms
+                    
                 self.last_button_press_time = current_time # Update the last button press time
 
                 if self.shared_state.in_menu:
@@ -106,7 +107,7 @@ class InputHandler:
         else: # Button is released
             self.rotary_used = False # Reset if rotary use between presses
             if self.button_pressed:
-                print('Button released')
+                #print('Button released')
                 self.button_pressed = False
                 if not self.shared_state.in_menu and self.shared_state.get_mode() == 'Manual':
                     self.shared_state.set_mode("Off")
@@ -114,36 +115,36 @@ class InputHandler:
 
     def check_click_count(self, timer):   
         if self.click_counter == 1:
-            print('Single click detected')
+            #print('Single click detected')
             if not self.shared_state.in_menu and not self.rotary_used:
-                print(str(self.shared_state.session_start_time))
+                #print(str(self.shared_state.session_start_time))
                 if self.shared_state.get_mode() == "Session":
                     if (self.shared_state.session_timeout - self.shared_state.get_session_mode_duration()) < 60000:
-                        self.shared_state.session_start_time = self.shared_state.session_start_time + 60000
+                        self.shared_state.session_start_time = self.shared_state.session_start_time + self.shared_state.session_extend_time
 
         elif self.click_counter == 2:
-            print('Double click detected')
+            #print('Double click detected')
             if not self.shared_state.in_menu:
                 self.shared_state.in_menu = True
                 self.shared_state.rotary_direction = 'up' # Just Fake it and go to top of menu to force screen refresh
-            else:
+            #else:
                 #print('Ignoring double click already in menu')
                 
         elif self.click_counter == 3:
-            print('Triple click detected')
+            #print('Triple click detected')
             if not self.shared_state.in_menu and not self.rotary_used:
                 if self.shared_state.get_mode() == "Off" :
-                    print("Switching to Session mode")
+                    #print("Switching to Session mode")
                     self.shared_state.set_mode("Session") 
                 elif self.shared_state.get_mode() == "Session":
                     self.shared_state.set_mode("Off")
                     #print("Stopped Session mode")
                     
         elif self.click_counter == 4:
-            print('Quadruple click detected')
+            #print('Quadruple click detected')
             if not self.shared_state.in_menu and not self.rotary_used:
                 if self.shared_state.get_mode() == "Off" :
-                    print("Switching to Session mode for 1 minute")
+                    #print("Switching to Session mode for 1 minute")
                     self.shared_state.set_mode("Session") 
                     self.shared_state.session_start_time = (utime.ticks_ms() - (self.shared_state.session_timeout - 60000))
                 #elif self.shared_state.get_mode() == "Session":
@@ -156,10 +157,10 @@ class InputHandler:
             self.click_check_timer.stop()
             
         if self.button_pressed:
-            print("Timer finished: Button still being held")
+            #print("Timer finished: Button still being held")
             if self.shared_state.get_mode() == 'Off' and not self.shared_state.in_menu and not self.rotary_used:
                 self.shared_state.set_mode("Manual")
-                print("Switching to Manual mode")
+                #print("Switching to Manual mode")
         else:
             self.rotary_used = False # Reset if rotary use between presses
-            print("Timer finished: Button released")
+            #print("Timer finished: Button released")

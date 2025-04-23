@@ -51,8 +51,6 @@ pid_tunings = 0.23, 0.003, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 oh
 # watts over time - should be able to work this out if we get the resitance as a constant and know the voltage - if we know the duty cylcle we should be able to work out the watts 
 # show watts use on display home screen? compare to power meter to see if its correct
 
-#quick heat function - if watts not too high maybe allow boost to speed up intial heat from cold (and temp under 100) and use up to 100W for 10-15 secs?
-
 
 hardware_pin_red_led = 17   # inicate heater (manal or session) is activated 
 hardware_pin_green_led = 18 # indicate within 10C of setemp in session mode
@@ -114,7 +112,9 @@ def get_input_volts(previous_reading):
     r1 = 910000   # 910kΩ
     r2 = 102000   # 102kΩ
     adc_value = adc_pin.read_u16()
- 
+
+    #print(str(adc_value))
+    
     if adc_value in [512, 1536, 2560, 3584]:  #problematic_values for rp2040 adc reading
         return previous_reading
 
@@ -129,6 +129,8 @@ def get_input_volts(previous_reading):
         correction = 0.140
         
     if previous_reading == False: previous_reading = voltage_in  # for first reading
+
+    #print(str(adc_value) + " " + str(voltage_adc) + " " + str(voltage_in))
     
     if previous_reading - (voltage_in - correction) > 1:  
         #its ok if it goes up we care more about max_duty cycle being too high
@@ -140,7 +142,11 @@ def get_input_volts(previous_reading):
         adc_value = adc_pin.read_u16()
         voltage_adc = adc_value * (3.3 / 65535)  # Convert ADC value to voltage
         voltage_in = voltage_adc * (r1 + r2) / r2 #calculate input voltage
-        #assume there really has been a change in voltage and not an error
+        if previous_reading - (voltage_in - correction) > 1:  
+            voltage_in = previous_reading - 0.3  # lets reduce by a little bit in case there really has been a drop
+                                                 # next time round it will drop again and again but it safer 
+                                                 # to drop in small amounts so we dont over power the mostfet in case its wrong
+            #print("Retry Read Input Voltage dropped by 0.5v:", voltage_in, "V")
     
     #print("Input Voltage:", voltage_in, "V")
     return round(voltage_in - correction, 2)
@@ -214,19 +220,17 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         if (shared_state.input_volts / shared_state.lipo_count) < shared_state.lipo_safe_volts:
             heater.off()
             shared_state.set_mode("Off")
-            display_manager.display_error("battery_level-too-low",10,True)    
+            display_manager.display_error("battery_level-too-low",10,True)
     elif shared_state.power_type == 'lead':
-        if (shared_state.input_volts  < shared_state.lead_safe_volts):
+        if shared_state.input_volts  < shared_state.lead_safe_volts:
             heater.off()
             shared_state.set_mode("Off")
-            display_manager.display_error("battery_level-too-low",10,True)    
+            display_manager.display_error("battery_level-too-low",10,True)
     elif shared_state.power_type == 'mains':
-        #mains powered 
-        #need to add in to below test the shared_state.heater_max_duty_cycle_percent and get watts and limit to 100?
-        if shared_state.input_volts > 15.0:
+        if shared_state.input_volts > shared_state.mains_safe_volts:
             heater.off()
             shared_state.set_mode("Off")
-            display_manager.display_error("mains-voltage-too-high",10,True)    #update error for dutycyle/watts instead 
+            display_manager.display_error("mains-voltage-too-high",10,True)
     else:
         heater.off()
         shared_state.set_mode("Off")
@@ -234,7 +238,10 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
    
         
     if power > shared_state.power_threshold:
-        if abs(shared_state.heater_temperature) > 350:  # Hard coded limit if user really wants to up this then up to them to edit code
+        # Hard coded this limit if user wants to go higher then they need to edit code - 
+        # Getting past PTFE safe limits so if using that as thermocouple/element protection 
+        # be careful not to burn through and short out the max6675 from the element
+        if abs(shared_state.heater_temperature) > 250:  
             if heater.is_on():
                 heater.off()
             error_text = "Pausing heater - " + shared_state.error_messages["heater-too_hot"] + " " + str(shared_state.heater_temperature)
@@ -264,21 +271,26 @@ class SharedState:
         #If more of these are added need to update line count in intputhandler for displing them
 
         
-        self.power_type = 'mains'
+        self.power_type = 'lipo'
         #self.power_type = 'lipo'  #'mains', 'lipo', 'lead'
+        
         self.lipo_count = 4
-        self.lipo_safe_volts = 3.1
+
+        self.lipo_safe_volts = 3.3
         self.lead_safe_volts = 12.0 
+        self.mains_safe_volts = 28.0 
 
         self.heater_resitance = 0.62  #this should not change unless coils is replaced user needs to provide this value
 
-        self.max_watts = 100 #130w for 0.6 ohm nichrome coil is about max before it starts to glow
+        self.max_watts = 100 #135w for 0.6 ohm nichrome coil is about max before it starts to glow
+                             #Note: 14 awg copper wire rated max amp is about 15amp - so at 12v = 180w max power to be safe
 
         self.heater_max_duty_cycle_percent = 0 #this now gets adjusted automatically based on max_watts / watt level
-
         self.input_volts = False  # Needs to be False at startup
        
-        self.session_timeout = 5 * 60 * 1000   # length of time for a session before auto off (5 mins)
+        self.session_timeout = 7 * 60 * 1000       # length of time for a session before auto off (7 mins)
+        self.session_extend_time = 2 * 60 * 1000   # length of time to extens senssion by when single click in last minute of session
+        
         self.temperature_units = 'C'       # Not tested F at all 
         
         self.setpoint = 170     # Initial PID setpoint 
@@ -298,24 +310,23 @@ class SharedState:
         # maybe need way to reset this in the termocouple class if loading setting between reboots?
         # calibrate by placeing thermopile in induction coil and seeing effects on readings when on / off 
         # dont set this too low 
-        self.heater_on_temperature_difference_threshold = 20 
+        self.heater_on_temperature_difference_threshold = 20 #for induction heaters
 
         self.display_contrast = 255
         self.display_rotate = True
         
         # Below is stuff perhaps better to leave alone
         self.click_check_timeout = 800 # ms timeout to multi click in 
-        self.max_allowed_setpoint = 299 # max allowed temperature
+        self.max_allowed_setpoint = 250 # max allowed temperature - need to protect ptfe around thermocouple
         
 
         # below are controlled by internal processes dont mess with 
         #self.temperature_readings =  {i: 20 for i in range(128)}
         self.temperature_readings =  {}
-        self.heater_temperature = 0  # Overal induction heater temperature from thermocouple at the moment only deals with one 
+        self.heater_temperature = 0  # Overal heater temperature from thermocouple at the moment only deals with one 
                                      # possibly extend to deal with multpile but not to start with
 
-        #shared_state.update_input_volts() #todo
-        self.input_volts_readings = {}
+        self.input_volts_readings = {}  #need to add volt graph
         self.input_volts = 0
         
         self.watt_readings = {}
@@ -353,7 +364,7 @@ class SharedState:
         self.rotary_direction = None
         self.rotary_last_mode = None
 
-        self.show_settings_line = 0
+        self.show_settings_line = 0  # for show settings in display to know what setting to show
         
         self.session_start_time = 0
         self.session_setpoint_reached = False
@@ -372,13 +383,14 @@ class SharedState:
         if self._mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
             session_start_time = 0
             led_green_pin.off()
+            led_blue_pin.off()  # In case session manually ended when light on
             self._mode = "Off"  # Set off here rather than after playing sounds as this can get called again while sounds being played
             self.session_setpoint_reached = False
-            buzzer_play_tone(buzzer, 1500, 200)
-            utime.sleep_ms(200)
-            buzzer_play_tone(buzzer, 1000, 200)
-            utime.sleep_ms(200)
-            buzzer_play_tone(buzzer, 500, 200)
+#            buzzer_play_tone(buzzer, 1500, 200)
+#            utime.sleep_ms(200)
+#            buzzer_play_tone(buzzer, 1000, 200)
+#            utime.sleep_ms(200)
+#            buzzer_play_tone(buzzer, 500, 200)
         return self._mode
 
     def set_mode(self, new_mode):
@@ -392,6 +404,7 @@ class SharedState:
         else:
             raise ValueError("Invalid mode. Must be 'Off', 'Session' or 'Manual'")
         if new_mode == "Off":
+            led_blue_pin.off() # In case session manually ended when light on
             led_green_pin.off()
         else:
             led_green_pin.on()
@@ -692,6 +705,11 @@ while True:
         led_red_pin.off()
 
     if shared_state.get_mode() == "Session":
+        if (shared_state.session_timeout - shared_state.get_session_mode_duration()) > 50000 and (shared_state.session_timeout - shared_state.get_session_mode_duration()) < 60000:
+            led_blue_pin.on()  #need to start timer to flash every 5 sec - maybe get faster as session gets closer to ending?
+        else:
+            led_blue_pin.off() #stop timer then turn off led
+            
         if shared_state.session_setpoint_reached == False:
              if shared_state.heater_temperature >= (shared_state.setpoint-8):  
                 shared_state.session_setpoint_reached = True
