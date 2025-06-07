@@ -372,22 +372,28 @@ class DisplayManager:
     def show_screen_home_screen(self, pid_components, heater):
         self.display.fill(0)
         shared_state = self.shared_state
-        if shared_state.temperature_units == 'F':
-            t = "T: " + str(int(32 + (1.8 * shared_state.heater_temperature))) + "F (" + str(int(32 + (1.8 * shared_state.setpoint))) + "F)"
+
+        if self.shared_state.control == 'watts':
+            t = "P: " + str(shared_state.watts) + "W (" + str(int(shared_state.setwatts)) + "W)"
+            self.display.text(t, 0, 0)
+            t = "V: " + "{:.1f}".format(shared_state.input_volts) + "V"
+            if shared_state.temperature_units == 'F':
+                t = t + " T: " + str(int(32 + (1.8 * shared_state.heater_temperature))) + "F"
+            else:
+                t = t + " T: " + str(int(shared_state.heater_temperature)) + "C"
+            self.display.text(t, 0, 8)
         else:
-            t = "T: " + str(int(shared_state.heater_temperature)) + "C (" + str(int(shared_state.setpoint)) + "C)"
-        self.display.text(t, 0, 0)
+            if shared_state.temperature_units == 'F':
+                t = "T: " + str(int(32 + (1.8 * shared_state.heater_temperature))) + "F (" + str(int(32 + (1.8 * shared_state.setpoint))) + "F)"
+            else:
+                t = "T: " + str(int(shared_state.heater_temperature)) + "C (" + str(int(shared_state.setpoint)) + "C)"
+            self.display.text(t, 0, 0)
+            t = "V: " + "{:.1f}".format(shared_state.input_volts) + "V"
+            if isinstance(heater, ElementHeater):
+                t = t + " P: " + str(shared_state.watts) + "W"
+            self.display.text(t, 0, 8)
 
-        #if heater.is_on():
-        #    #t = "H: On"
-        #else:
-        #    t = "H: Off"
-        #t = "V: " + str(shared_state.input_volts) + "V"
-        t = "V: " + "{:.1f}".format(shared_state.input_volts) + "V"
-        if isinstance(heater, ElementHeater):
-            t = t + " P: " + str(shared_state.watts) + "W"
 
-        self.display.text(t, 0, 8)
 
         t = "M: " + shared_state.get_mode()
         if shared_state.get_mode() == "Session":
@@ -401,16 +407,16 @@ class DisplayManager:
         #    t = "Mode: " + str(int(pi_temperature)) + "C"
         
         self.display.text(t, 0, 16)
-        
-        p, i, d = pid_components
-        if d > 0:
-            t = "{:.1f} {:.2f} {:.2f}".format(p, i, d)
-        else:
-            t = "{:.1f} {:.1f}".format(p, i)
-        if heater.is_on() and isinstance(heater, ElementHeater):
-            t = t + " P: " + "{:.1f}".format(heater.get_power())
-            
-        self.display.text(t, 0, 24)
+        if self.shared_state.control == 'pid':
+            p, i, d = pid_components
+            if d > 0:
+                t = "{:.1f} {:.2f} {:.2f}".format(p, i, d)
+            else:
+                t = "{:.1f} {:.1f}".format(p, i)
+            if heater.is_on() and isinstance(heater, ElementHeater):
+                t = t + " P: " + "{:.1f}".format(heater.get_power())
+                
+            self.display.text(t, 0, 24)
 
     def show_screen_show_settings(self):
         self.display.fill(0)

@@ -4,7 +4,7 @@ from rotary_irq_rp2 import RotaryIRQ
 from customtimer import CustomTimer
 
 class InputHandler:
-    def __init__(self, rotary_clk_pin, rotary_dt_pin, button_pin, shared_state):
+    def __init__(self, rotary_clk_pin, rotary_dt_pin, button_pin, switch_control_pin, shared_state):
     
         print("InputHandler Initialising ...")
         self.rotary = RotaryIRQ(pin_num_clk=rotary_clk_pin, pin_num_dt=rotary_dt_pin, reverse=True, range_mode=RotaryIRQ.RANGE_BOUNDED)
@@ -22,6 +22,12 @@ class InputHandler:
         self.click_check_timer = CustomTimer(period=self.shared_state.click_check_timeout, mode=Timer.ONE_SHOT, callback=self.check_click_count)
         
         self.previous_rotary_value = self.rotary.value() # Initialize the previous rotary value
+
+
+        self.switch_control_button = Pin(switch_control_pin, Pin.IN, Pin.PULL_UP)
+        self.switch_control_button_pressed = False
+        self.switch_control_button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.switch_control_button_state_changed)
+
         
         print("InputHandler initialised.")
 
@@ -47,17 +53,24 @@ class InputHandler:
             self.rotary.set(value=self.shared_state.show_settings_line)
             self.previous_rotary_value = self.shared_state.show_settings_line
             self.rotary.set(min_val=0)
-            self.rotary.set(max_val=35) #change to count of settings 
+            self.rotary.set(max_val=38) #change to count of settings 
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Show Settings"
             print("setup rotarty show settings" + str(self.rotary.value()))
 
         else:
             if self.shared_state.rotary_last_mode != "setpoint":
-                self.rotary.set(value=self.shared_state.setpoint)
-                self.previous_rotary_value = self.shared_state.setpoint
-                self.rotary.set(min_val=1)
-                self.rotary.set(max_val=self.shared_state.max_allowed_setpoint)  # Max temp - allow conversion to F?
+                if self.shared_state.control == 'watts':
+                    self.rotary.set(value=self.shared_state.setwatts)
+                    self.previous_rotary_value = self.shared_state.setwatts
+                    self.rotary.set(min_val=0)
+                    self.rotary.set(max_val=self.shared_state.max_watts)
+                else:
+                    self.rotary.set(value=self.shared_state.setpoint)
+                    self.previous_rotary_value = self.shared_state.setpoint
+                    self.rotary.set(min_val=1)
+                    self.rotary.set(max_val=self.shared_state.max_allowed_setpoint)  # Max temp - allow conversion to F?
+                
                 self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
                 self.shared_state.rotary_last_mode = "setpoint"
                 print("setup rotarty setpoint" + str(self.rotary.value()))
@@ -80,7 +93,10 @@ class InputHandler:
             elif self.shared_state.menu_options[self.shared_state.current_menu_position] == "Show Settings":
                 self.shared_state.show_settings_line = self.rotary.value()
             else:
-                self.shared_state.setpoint = self.rotary.value()
+                if self.shared_state.control == 'watts':
+                    self.shared_state.setwatts = self.rotary.value()
+                else:
+                    self.shared_state.setpoint = self.rotary.value()
 
         self.previous_rotary_value = self.rotary.value()
         #print(f"{self.shared_state.rotary_last_mode} Prvious Rotary: {self.previous_rotary_value}, Rotary value: {self.rotary.value()}")
@@ -164,3 +180,21 @@ class InputHandler:
         else:
             self.rotary_used = False # Reset if rotary use between presses
             #print("Timer finished: Button released")
+ 
+    def switch_control_button_state_changed(self, pin):
+        if pin.value() == 0: # Button is pressed
+                self.switch_control_button_pressed = True
+        else:
+                self.switch_control_button_pressed = False
+                
+        if self.switch_control_button_pressed:
+            if self.shared_state.control == 'pid': 
+                self.shared_state.control = 'watts'
+                self.rotary.set(value=self.shared_state.setwatts)
+                self.previous_rotary_value = self.shared_state.setwatts
+            else:
+                self.shared_state.control = 'pid'
+                self.rotary.set(value=self.shared_state.setpoint)
+                self.previous_rotary_value = self.shared_state.setpoint
+            self.setup_rotary_values()
+

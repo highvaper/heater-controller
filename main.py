@@ -170,8 +170,11 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     shared_state.input_volts = get_input_volts(shared_state.input_volts)
 
     #shared_state.heater_max_duty_cycle_percent - need to update this now and adjust to MAX WATTS (add to shared state)
-    
-    shared_state.heater_max_duty_cycle_percent = (shared_state.max_watts / (shared_state.input_volts * shared_state.input_volts / shared_state.heater_resitance)) * 100  
+    if shared_state.input_volts > 0:
+        shared_state.heater_max_duty_cycle_percent = (shared_state.max_watts / (shared_state.input_volts * shared_state.input_volts / shared_state.heater_resitance)) * 100  
+    else:
+        shared_state.heater_max_duty_cycle_percent = 100
+        
     if shared_state.heater_max_duty_cycle_percent > 100:
         shared_state.heater_max_duty_cycle_percent = 100
     heater.set_max_duty_cycle(shared_state.heater_max_duty_cycle_percent)
@@ -209,9 +212,14 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         shared_state.watts = 0
         shared_state.watt_readings[utime.ticks_ms()] = 0
 
+    if shared_state.control == 'pid': 
+        power = pid(shared_state.heater_temperature)  # Update pid even if heater is off
+    else:
+        pid.reset()  #better to move to where control state changes in inputhandler but pid is not in shared state so need to move there too
+        power = (shared_state.setwatts/shared_state.max_watts) * 10
 
-    power = pid(shared_state.heater_temperature)  # Update pid even if heater is off
-
+    power = min(power , 10)  #Limit happening in heater set power but lets limit here too
+    
     if shared_state.get_mode() == "Off": 
         heater.off()
         return
@@ -270,8 +278,12 @@ class SharedState:
 
         #If more of these are added need to update line count in intputhandler for displing them
 
+        self.control = 'pid'
+        #self.control = 'watts'
+        self.setwatts = 20  # like setpoint but for watts
         
-        self.power_type = 'lipo'
+        
+        self.power_type = 'mains'
         #self.power_type = 'lipo'  #'mains', 'lipo', 'lead'
         
         self.lipo_count = 4
@@ -280,10 +292,11 @@ class SharedState:
         self.lead_safe_volts = 12.0 
         self.mains_safe_volts = 28.0 
 
-        self.heater_resitance = 0.62  #this should not change unless coils is replaced user needs to provide this value
+        self.heater_resitance = 0.61  #this should not change unless coils is replaced user needs to provide this value
 
         self.max_watts = 100 #135w for 0.6 ohm nichrome coil is about max before it starts to glow
                              #Note: 14 awg copper wire rated max amp is about 15amp - so at 12v = 180w max power to be safe
+                             #Keep to 100w for single mosfet unit if doing them in parrallel then ok to go more
 
         self.heater_max_duty_cycle_percent = 0 #this now gets adjusted automatically based on max_watts / watt level
         self.input_volts = False  # Needs to be False at startup
@@ -293,7 +306,7 @@ class SharedState:
         
         self.temperature_units = 'C'       # Not tested F at all 
         
-        self.setpoint = 170     # Initial PID setpoint 
+        self.setpoint = 175     # Initial PID setpoint 
         
         # When in session mode and we first hist setpoint make led change colour ?  and / or sound a buzzer 
         # When session mode about to end (5 secs?) sound buzzer so user can extens easily -
@@ -529,6 +542,7 @@ del button_pin
 
 
 
+
 #switch_middle = Pin(hardware_pin_switch_middle, Pin.IN, Pin.PULL_UP)
 
 #def switch_middle_pressed(pin):
@@ -566,7 +580,7 @@ shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_
 
 
 # InputHandler
-input_handler = InputHandler(rotary_clk_pin=hardware_pin_rotary_clk, rotary_dt_pin=hardware_pin_rotary_dt, button_pin=hardware_pin_button, shared_state=shared_state)
+input_handler = InputHandler(rotary_clk_pin=hardware_pin_rotary_clk, rotary_dt_pin=hardware_pin_rotary_dt, button_pin=hardware_pin_button, switch_control_pin=hardware_pin_switch_left, shared_state=shared_state)
 
 # MenuSystem
 menu_system = MenuSystem(display_manager, shared_state)
@@ -654,6 +668,7 @@ print("Timers initialised.")
 # Lets enable and see if it helps when heater on and we crash
 # So far from simulated tests this seems to work and heater pin is reset
 
+#enable_watchdog = False
 if enable_watchdog: 
     watchdog = machine.WDT(timeout=(1000 * 3)) 
     print("Watchdog enabled")
@@ -722,14 +737,15 @@ while True:
     # need to check if heater is on and temps not rising to warn user after 10 sec? 
     # eg heater pwm cable could be loose , no power to heater,  thermocouple issue 
     
-    iteration_count += 1
-    current_time = utime.ticks_ms()
-    elapsed_time = utime.ticks_diff(current_time, start_time)
-    if elapsed_time >= 1000: 
-        refresh_rate = iteration_count / (elapsed_time / 1000.0)
-       # print("Refresh rate:", refresh_rate, "Hz")
-        iteration_count = 0
-        start_time = utime.ticks_ms()
+#Refrersh rate
+#    iteration_count += 1
+#    current_time = utime.ticks_ms()
+#    elapsed_time = utime.ticks_diff(current_time, start_time)
+#    if elapsed_time >= 1000: 
+#        refresh_rate = iteration_count / (elapsed_time / 1000.0)
+#       # print("Refresh rate:", refresh_rate, "Hz")
+#        iteration_count = 0
+#        start_time = utime.ticks_ms()
 
 ## Sort of a load average 
 #    for i in range(len(iteration_counts)):
