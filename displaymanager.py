@@ -565,7 +565,7 @@ class DisplayManager:
 
 
     def show_screen_menu(self):
-        print("DisplayManager: show_screen_menu() called")
+        #print("DisplayManager: show_screen_menu() called")
         self.display.fill(0)
 
         # Calculate the range to ensure the selected option is always in the middle
