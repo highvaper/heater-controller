@@ -1,8 +1,5 @@
 import utime
-try:
-    import uasyncio as asyncio
-except Exception:
-    asyncio = None
+import uasyncio as asyncio
 #from customtimer import CustomTimer
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
