@@ -3,6 +3,8 @@ import sys
 from machine import ADC, Pin, I2C, Timer, WDT, PWM
 from ssd1306 import SSD1306_I2C
 
+import uasyncio as asyncio
+
 from simple_pid import PID
 
 from errormessage import ErrorMessage
@@ -280,7 +282,7 @@ class SharedState:
 
         self.control = 'pid'
         #self.control = 'watts'
-        self.setwatts = 20  # like setpoint but for watts
+        self.setwatts = 30  # like setpoint but for watts
         
         
         self.power_type = 'mains'
@@ -294,7 +296,7 @@ class SharedState:
 
         self.heater_resitance = 0.61  #this should not change unless coils is replaced user needs to provide this value
 
-        self.max_watts = 50 #135w for 0.6 ohm nichrome coil is about max before it starts to glow
+        self.max_watts = 75 #135w for 0.6 ohm nichrome coil is about max before it starts to glow
                              #Note: 14 awg copper wire rated max amp is about 15amp - so at 12v = 180w max power to be safe
                              #Keep to 100w for single mosfet unit if doing them in parrallel then ok to go more
 
@@ -306,7 +308,7 @@ class SharedState:
         
         self.temperature_units = 'C'       # Not tested F at all 
         
-        self.setpoint = 175     # Initial PID setpoint 
+        self.setpoint = 165     # Initial PID setpoint 
         
         # When in session mode and we first hist setpoint make led change colour ?  and / or sound a buzzer 
         # When session mode about to end (5 secs?) sound buzzer so user can extens easily -
@@ -500,7 +502,7 @@ shared_state = SharedState()
 # DisplayManager
 try:
     display_manager = DisplayManager(display, shared_state)
-    display_manager.show_startup_screen()
+    # startup screen will be scheduled from async_main so it doesn't block here
 except Exception as e:
     error_text = "Start up failed - [display-setup] " + shared_state.error_messages["display-setup"] + " " + str(e)
     print(error_text + " " + str(e))
@@ -567,8 +569,18 @@ except Exception as e:
     error_text = "Start up failed: " + str(e)
     print(error_text)
     while True:
-        display_manager.display_error("thermocouple-setup")
-        utime.sleep_ms(100)
+        try:
+            # Use blocking draw so message appears before asyncio loop starts
+            display_manager.fill_display("thermocouple-setup", 0, 12)
+        except Exception:
+            try:
+                # Fallback to raw display if DisplayManager isn't available
+                display.fill(0)
+                display.text("thermocouple-setup", 0, 12, 1)
+                display.show()
+            except Exception:
+                pass
+        utime.sleep_ms(500)
     sys.exit() #?
 
 
@@ -647,12 +659,11 @@ shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_erro
 
 
 print("Timers Initialising ...")
-pidTimer.start()
-pid.reset()
-
+# Do not start timers here; they'll be started when the asyncio loop is running
+# pidTimer.start()
+# pid.reset()
 
 piTempTimer = CustomTimer(903, machine.Timer.PERIODIC, timerSetPiTemp)
-piTempTimer.start()
 
 
 
@@ -685,60 +696,107 @@ refresh_rate = 0
 #period_durations = [1000, 10000, 30000]
 
 
-while True:
-    if not shared_state.in_menu:
-        #print(shared_state.current_menu_position)
-        if shared_state.current_menu_position <= 1:
-            if shared_state.rotary_last_mode != "setpoint": 
+async def async_main():
+    # Start periodic timers now that (optionally) the asyncio loop is running.
+    try:
+        pidTimer.start()
+        pid.reset()
+    except Exception:
+        pass
+    try:
+        piTempTimer.start()
+    except Exception:
+        pass
+
+    # Start display heartbeat as a background task if available
+    if hasattr(display_manager, 'start_heartbeat') and asyncio:
+        try:
+            display_manager.start_heartbeat(loop=asyncio.get_event_loop(), interval_ms=70)
+        except Exception:
+            try:
+                display_manager.start_heartbeat(interval_ms=70)
+            except Exception:
+                pass
+
+    # Show startup screen asynchronously if possible
+    try:
+        display_manager.show_startup_screen()
+    except Exception:
+        pass
+
+    while True:
+        if not shared_state.in_menu:
+            if shared_state.current_menu_position <= 1:
+                # ensure rotary values set once
+                if shared_state.rotary_last_mode != "setpoint":
+                    input_handler.setup_rotary_values()
+                shared_state.current_menu_position = 1
+                # start async home-screen updater (no-op if already running)
+                display_manager.start_home(lambda: pid.components, heater, loop=asyncio.get_event_loop() if asyncio else None, interval_ms=200)
+            else:
+                # leaving home/menu selection - stop async home updates
+                display_manager.stop_home()
+                if shared_state.rotary_last_mode != shared_state.menu_options[shared_state.current_menu_position]:
+                    input_handler.setup_rotary_values()
+                menu_system.display_selected_option()
+        else:
+            # we're in the menu; ensure async home-screen updates are stopped
+            display_manager.stop_home()
+            if shared_state.rotary_last_mode != "menu":
+                shared_state.current_menu_position = 0
                 input_handler.setup_rotary_values()
-            shared_state.current_menu_position = 1
-            display_manager.show_screen_home_screen(pid.components, heater)
-            display_manager.display_heartbeat()
+                # Force an initial menu draw when entering menu
+                try:
+                    menu_system.display_menu()
+                except Exception:
+                    pass
+            if shared_state.menu_selection_pending:
+                menu_system.handle_menu_selection()
+                shared_state.menu_selection_pending = False
+            elif shared_state.rotary_direction is not None:
+                menu_system.navigate_menu(shared_state.rotary_direction)
+                shared_state.rotary_direction = None
+            else:
+                pass
+
+        if shared_state.heater_temperature >= (shared_state.setpoint-8) and shared_state.heater_temperature <= (shared_state.setpoint+8):
+            led_red_pin.on()
         else:
-            if shared_state.rotary_last_mode != shared_state.menu_options[shared_state.current_menu_position]: 
-                input_handler.setup_rotary_values()
-            #print ("Displaying " + shared_state.menu_options[shared_state.current_menu_position])
-            menu_system.display_selected_option()
-            
-    else:
-        if shared_state.rotary_last_mode != "menu": 
-            shared_state.current_menu_position = 0
-            input_handler.setup_rotary_values()
-        if shared_state.menu_selection_pending:
-            menu_system.handle_menu_selection()                                               
-            shared_state.menu_selection_pending = False
+            led_red_pin.off()
 
-        elif shared_state.rotary_direction is not None:
-            menu_system.navigate_menu(shared_state.rotary_direction)
-            shared_state.rotary_direction = None
+        if shared_state.get_mode() == "Session":
+            if (shared_state.session_timeout - shared_state.get_session_mode_duration()) > 50000 and (shared_state.session_timeout - shared_state.get_session_mode_duration()) < 60000:
+                led_blue_pin.on()
+            else:
+                led_blue_pin.off()
+            if shared_state.session_setpoint_reached == False:
+                if shared_state.heater_temperature >= (shared_state.setpoint-8):
+                    shared_state.session_setpoint_reached = True
+                    buzzer_play_tone(buzzer, 1500, 350)
+                    if shared_state.session_reset_pid_when_near_setpoint:
+                        pid.reset()
+
+        if enable_watchdog:
+            try:
+                watchdog.feed()
+            except Exception:
+                pass
+
+        if asyncio:
+            await asyncio.sleep_ms(70)
         else:
-            pass
+            utime.sleep_ms(70)
 
-    if shared_state.heater_temperature >= (shared_state.setpoint-8) and shared_state.heater_temperature <= (shared_state.setpoint+8):
-        led_red_pin.on()
-    else:
-        led_red_pin.off()
 
-    if shared_state.get_mode() == "Session":
-        if (shared_state.session_timeout - shared_state.get_session_mode_duration()) > 50000 and (shared_state.session_timeout - shared_state.get_session_mode_duration()) < 60000:
-            led_blue_pin.on()  #need to start timer to flash every 5 sec - maybe get faster as session gets closer to ending?
-        else:
-            led_blue_pin.off() #stop timer then turn off led
-            
-        if shared_state.session_setpoint_reached == False:
-             if shared_state.heater_temperature >= (shared_state.setpoint-8):  
-                shared_state.session_setpoint_reached = True
-                buzzer_play_tone(buzzer, 1500, 350)
-                if shared_state.session_reset_pid_when_near_setpoint:
-                    pid.reset()
+if __name__ == '__main__':
 
-    if enable_watchdog: watchdog.feed()
-
-    # need to check if heater is on and temps not rising to warn user after 10 sec? 
-    # eg heater pwm cable could be loose , no power to heater,  thermocouple issue 
-    
-#Refrersh rate
-#    iteration_count += 1
+    try:
+        asyncio.run(async_main())
+    except Exception:
+        loop = asyncio.get_event_loop()
+        loop.create_task(async_main())
+        loop.run_forever()
+   
 #    current_time = utime.ticks_ms()
 #    elapsed_time = utime.ticks_diff(current_time, start_time)
 #    if elapsed_time >= 1000: 

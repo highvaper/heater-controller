@@ -5,7 +5,7 @@ from customtimer import CustomTimer
 class MenuSystem:
     def __init__(self, display_manager, shared_state):
     
-        print("MenuSystem Initialising ...")
+        #print("MenuSystem Initialising ...")
         
         self.display_manager = display_manager
         self.shared_state = shared_state
@@ -16,7 +16,7 @@ class MenuSystem:
         #self.last_navigation_time = 0
         #self.navigation_debounce_ms = 500
 
-        print("MenuSystem initialised.")
+        #print("MenuSystem initialised.")
 
 
 

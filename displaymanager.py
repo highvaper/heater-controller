@@ -1,4 +1,8 @@
 import utime
+try:
+    import uasyncio as asyncio
+except Exception:
+    asyncio = None
 #from customtimer import CustomTimer
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
@@ -14,6 +18,10 @@ class DisplayManager:
         self.scroll_position = 0
         self.display.contrast(self.shared_state.display_contrast)
         self.display.rotate(self.shared_state.display_rotate)
+
+        self._home_task = None
+        self._heartbeat_task_obj = None
+        self._screen_task = None
 
         print("DisplayManager initialised.")
 
@@ -37,6 +45,82 @@ class DisplayManager:
         self.display.show()
 
 
+    async def _heartbeat_task(self, interval_ms=70):
+        while True:
+            try:
+                # Only draw heartbeat on the home screen and when not in the menu
+                if (not getattr(self.shared_state, 'in_menu', False)) and (getattr(self.shared_state, 'current_menu_position', 1) == 1):
+                    self.display_heartbeat()
+            except Exception:
+                pass
+            await asyncio.sleep_ms(interval_ms)
+
+    def start_heartbeat(self, loop=None, interval_ms=70):
+        if asyncio and loop is not None:
+            self._heartbeat_task_obj = loop.create_task(self._heartbeat_task(interval_ms))
+        else:
+            self._heartbeat_task_obj = asyncio.get_event_loop().create_task(self._heartbeat_task(interval_ms))
+
+    async def _show_startup(self):
+        # original blocking startup screen but async-friendly
+        try:
+            self.display.fill(0)
+
+            self.display.text('MicroPython',  self.get_centered_text_start_position('MicroPython'), 0, 1)
+            self.display.text('Heater', self.get_centered_text_start_position('Heater'), 8, 1)
+            self.display.text('Controller', self.get_centered_text_start_position('Controller'), 16, 1)
+            self.display.text('', self.get_centered_text_start_position(''), 24, 1)
+            self.display.show()
+        except Exception:
+            pass
+        await asyncio.sleep_ms(2000)
+
+    def show_startup_screen(self):
+        loop = asyncio.get_event_loop()
+        loop.create_task(self._show_startup())
+        return
+
+    async def _home_task_fn(self, pid_components_getter, heater, interval_ms=200):
+        while True:
+            try:
+                # Do not draw home screen while menu is active
+                if getattr(self.shared_state, 'in_menu', False):
+                    # yield/sleep to avoid busy loop
+                    await asyncio.sleep_ms(interval_ms)
+                    continue
+
+                comps = pid_components_getter()
+                self.show_screen_home_screen(comps, heater)
+            except Exception:
+                pass
+            await asyncio.sleep_ms(interval_ms)
+
+    def start_home(self, pid_components_getter, heater, loop=None, interval_ms=200):
+        if self._home_task is not None:
+            return
+        try:
+            if loop is None:
+                loop = asyncio.get_event_loop()
+            self._home_task = loop.create_task(self._home_task_fn(pid_components_getter, heater, interval_ms))
+        except Exception:
+            self._home_task = None
+
+    def stop_home(self):
+        try:
+            if self._home_task is not None:
+                self._home_task.cancel()
+        except Exception:
+            pass
+        self._home_task = None
+        # Cancel any on-screen screen task (e.g. graphs) when stopping home updates
+        try:
+            if self._screen_task is not None:
+                self._screen_task.cancel()
+        except Exception:
+            pass
+        self._screen_task = None
+
+
     def fill_display(self, text, x=0, y=0, invert=False):
         self.display.fill(0)
         self.display.text(text, x, y, 1)
@@ -47,7 +131,7 @@ class DisplayManager:
             self.display.invert(False)
 
 
-    def display_error(self, message, duration=5, show_countdown=False):
+    async def _display_error(self, message, duration=5, show_countdown=False):
         message_length = len(message) * 8 # Assuming each character is 8 pixels wide
         start_time = utime.ticks_ms()
         scroll_speed = 20 # Time in milliseconds to wait before moving to the next character
@@ -55,30 +139,44 @@ class DisplayManager:
         message_display_time = (message_length + (128*8)) * scroll_speed # Total time to display the message
 
         while utime.ticks_diff(utime.ticks_ms(), start_time) < message_display_time:
-            self.display.fill(0) # Clear the display
+            try:
+                self.display.fill(0) # Clear the display
 
-      
-            # Scrolling logic for the message
-            self.display.text(message, message_scroll_position, 12, 1)
-            message_scroll_position -= 1
-            if message_scroll_position < -message_length:
-                message_scroll_position = 128
+                # Scrolling logic for the message
+                self.display.text(message, message_scroll_position, 12, 1)
+                message_scroll_position -= 1
+                if message_scroll_position < -message_length:
+                    message_scroll_position = 128
 
-            if show_countdown:
-                elapsed_time = utime.ticks_diff(utime.ticks_ms(), start_time) / 1000 # Convert to seconds
-                remaining_time = duration - elapsed_time
-                countdown_text = f"{int(remaining_time)}s"
-                countdown_length = len(countdown_text) * 8 
-                # Calculate the starting position for the countdown to center it
-                countdown_start_position = (128 - countdown_length) // 2
-                self.display.text(countdown_text, countdown_start_position, 24, 1)
+                if show_countdown:
+                    elapsed_time = utime.ticks_diff(utime.ticks_ms(), start_time) / 1000 # Convert to seconds
+                    remaining_time = duration - elapsed_time
+                    countdown_text = f"{int(remaining_time)}s"
+                    countdown_length = len(countdown_text) * 8 
+                    # Calculate the starting position for the countdown to center it
+                    countdown_start_position = (128 - countdown_length) // 2
+                    self.display.text(countdown_text, countdown_start_position, 24, 1)
 
+                self.display.show()
+            except Exception:
+                pass
+
+            if asyncio:
+                await asyncio.sleep_ms(scroll_speed)
+            else:
+                utime.sleep_ms(scroll_speed)
+
+        try:
+            self.display.fill(0)
             self.display.show()
-            utime.sleep_ms(scroll_speed) # Wait for a short period before updating the display again
+        except Exception:
+            pass
 
-        self.display.fill(0)
-        self.display.show()
-        
+
+    def display_error(self, message, duration=5, show_countdown=False):
+        loop = asyncio.get_event_loop()
+        loop.create_task(self._display_error(message, duration, show_countdown))
+        return
 
 
     def show_startup_screen(self):
@@ -467,6 +565,7 @@ class DisplayManager:
 
 
     def show_screen_menu(self):
+        print("DisplayManager: show_screen_menu() called")
         self.display.fill(0)
 
         # Calculate the range to ensure the selected option is always in the middle
@@ -501,6 +600,32 @@ class DisplayManager:
         method_name = f"show_screen_{option}"
         method = getattr(self, method_name, None)
         if method:
+            # Keep graph-like screens displayed in a small async loop so they yield
+            graph_options = {'graph_bar', 'graph_line', 'graph_setpoint', 'temp_watts_line', 'watts_line'}
+            #if asyncio and option in graph_options:
+            if option in graph_options:
+                try:
+                    loop = asyncio.get_event_loop()
+                    # Cancel any existing screen task
+                    try:
+                        if self._screen_task is not None:
+                            self._screen_task.cancel()
+                    except Exception:
+                        pass
+
+                    async def _screen_loop():
+                        while getattr(self.shared_state, 'current_menu_position', 1) > 1 and not getattr(self.shared_state, 'in_menu', False):
+                            try:
+                                method()
+                            except Exception:
+                                pass
+
+                            await asyncio.sleep_ms(300)
+
+                    self._screen_task = loop.create_task(_screen_loop())
+                    return
+                except Exception:
+                    # scheduling failed; fall back to single draw
+                    pass
+            # default: single synchronous draw
             method()
-        else:
-            print(f"No method found for option: {option}")
