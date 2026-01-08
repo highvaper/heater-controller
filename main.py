@@ -294,7 +294,7 @@ class SharedState:
 
         self.heater_resitance = 0.61  #this should not change unless coils is replaced user needs to provide this value
 
-        self.max_watts = 100 #135w for 0.6 ohm nichrome coil is about max before it starts to glow
+        self.max_watts = 50 #135w for 0.6 ohm nichrome coil is about max before it starts to glow
                              #Note: 14 awg copper wire rated max amp is about 15amp - so at 12v = 180w max power to be safe
                              #Keep to 100w for single mosfet unit if doing them in parrallel then ok to go more
 
