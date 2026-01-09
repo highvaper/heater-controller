@@ -23,7 +23,7 @@ class PID(object):
         auto_mode=True,
         proportional_on_measurement=False,
         differential_on_measurement=True,
-        error_map=None,
+       # error_map=None,
         time_fn=None,
         starting_output=0.0,
     ):
@@ -68,7 +68,7 @@ class PID(object):
         self._auto_mode = auto_mode
         self.proportional_on_measurement = proportional_on_measurement
         self.differential_on_measurement = differential_on_measurement
-        self.error_map = error_map
+        #self.error_map = error_map
 
         self._proportional = 0
         self._integral = 0
@@ -128,8 +128,8 @@ class PID(object):
         d_error = error - (self._last_error if (self._last_error is not None) else error)
 
         # Check if must map the error
-        if self.error_map is not None:
-            error = self.error_map(error)
+       # if self.error_map is not None:
+        #    error = self.error_map(error)
 
         # Compute the proportional term
         if not self.proportional_on_measurement:
@@ -161,16 +161,25 @@ class PID(object):
         return output
 
     def __repr__(self):
-        return (
-            '{self.__class__.__name__}('
-            'Kp={self.Kp!r}, Ki={self.Ki!r}, Kd={self.Kd!r}, '
-            'setpoint={self.setpoint!r}, sample_time={self.sample_time!r}, '
-            'output_limits={self.output_limits!r}, auto_mode={self.auto_mode!r}, '
-            'proportional_on_measurement={self.proportional_on_measurement!r}, '
-            'differential_on_measurement={self.differential_on_measurement!r}, '
-            'error_map={self.error_map!r}'
-            ')'
-        ).format(self=self)
+       return (
+            "PIDController(" +
+            "Kp={}, Ki={}, Kd={}, ".format(self.Kp, self.Ki, self.Kd) +
+            "setpoint={}, sample_time={}, ".format(self.setpoint, self.sample_time) +
+            "output_limits={}, auto_mode={}, ".format(self.output_limits, self.auto_mode) +
+            "proportional_on_measurement={}, ".format(self.proportional_on_measurement) +
+            "differential_on_measurement={} ".format(self.differential_on_measurement) +
+            ")"
+        )        
+        #return (
+        #    '{self.__class__.__name__}('
+        #    'Kp={self.Kp!r}, Ki={self.Ki!r}, Kd={self.Kd!r}, '
+        #    'setpoint={self.setpoint!r}, sample_time={self.sample_time!r}, '
+        #    'output_limits={self.output_limits!r}, auto_mode={self.auto_mode!r}, '
+        #    'proportional_on_measurement={self.proportional_on_measurement!r}, '
+        #    'differential_on_measurement={self.differential_on_measurement!r}, '
+        #    'error_map={self.error_map!r}'
+        #    ')'
+        #).format(self=self)
 
     @property
     def components(self):
