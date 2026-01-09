@@ -87,7 +87,7 @@ class ElementHeater(BaseHeater):
         print("ElementHeater Initialising ...")
         self.element = Pin(element_pin, Pin.OUT)
         self.pwm = PWM(self.element) 
-        self.pwm.freq(25) # Maybe too much? need to see how this goes with nichrome
+        self.pwm.freq(50) # Maybe too much? need to see how this goes with nichrome
         self.pwm.duty_u16(0) # Initialize PWM duty cycle to 0 (off)
         self._power = 0
         self.max_duty_cycle_percent = 0

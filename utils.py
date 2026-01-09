@@ -2,9 +2,10 @@ import utime
 #import sys ? do we need this?
 
 #from machine import ADC, Pin, I2C, Timer, WDT, PWM
-from machine import ADC, Pin, I2C
+from machine import Pin, I2C
 from ssd1306 import SSD1306_I2C
 from heaters import HeaterFactory, InductionHeater, ElementHeater
+from machine import ADC
 
 from errormessage import ErrorMessage #remove
 
@@ -108,6 +109,52 @@ def initialize_display(i2c_scl, i2c_sda, led_pin):
         #sys.exit()
 
     return display
+
+
+def get_input_volts(previous_reading):
+    adc_pin = ADC(28)
+    r1 = 910000   # 910kΩ
+    r2 = 102000   # 102kΩ
+    adc_value = adc_pin.read_u16()
+
+    #print(str(adc_value))
+    
+    if adc_value in [512, 1536, 2560, 3584]:  #problematic_values for rp2040 adc reading
+        return previous_reading
+
+    voltage_adc = adc_value * (3.3 / 65535)  # Convert ADC value to voltage
+    voltage_in = voltage_adc * (r1 + r2) / r2 #calculate input voltage
+     
+    if voltage_in < 4.0:
+        correction = 0.220
+    elif voltage_in < 8.0:
+        correction = 0.180
+    else:
+        correction = 0.140
+        
+    if previous_reading == False: previous_reading = voltage_in  # for first reading
+
+    #print(str(adc_value) + " " + str(voltage_adc) + " " + str(voltage_in))
+    
+    if previous_reading - (voltage_in - correction) > 1:  
+        #its ok if it goes up we care more about max_duty cycle being too high
+        #this is to cover the adc bug with the rp2040
+        #maybe need to loop a few times and get average rather than just one reading as this still give od rreading sometimes
+        
+        #print("Retry Read Input Voltage:", voltage_in, "V")
+        utime.sleep_ms(150)
+        adc_value = adc_pin.read_u16()
+        voltage_adc = adc_value * (3.3 / 65535)  # Convert ADC value to voltage
+        voltage_in = voltage_adc * (r1 + r2) / r2 #calculate input voltage
+        if previous_reading - (voltage_in - correction) > 1:  
+            voltage_in = previous_reading - 0.3  # lets reduce by a little bit in case there really has been a drop
+                                                 # next time round it will drop again and again but it safer 
+                                                 # to drop in small amounts so we dont over power the mostfet in case its wrong
+            #print("Retry Read Input Voltage dropped by 0.5v:", voltage_in, "V")
+    
+    #print("Input Voltage:", voltage_in, "V")
+    return round(voltage_in - correction, 2)
+    
 
 def buzzer_play_tone(buzzer, frequency, duration):
     #need to do this as a separate thread as this blocks
