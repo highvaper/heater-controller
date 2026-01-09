@@ -79,12 +79,14 @@ https://thonny.org/
 - When the setpoint temperature is reached, the red LED lights.
 - You can extend the session by pressing the button in the last minute of the session.
 
-### PID Mode
+### Temperature Mode
 - The default mode uses PID control to maintain the setpoint temperature.
 - The rotary encoder adjusts the setpoint.
 
-### Manual Mode (Watts Mode)
-- In Manual mode, you can directly set the heater power in watts, ignoring the temperature setpoint and PID control.
+### Watts Mode
+- In watts mode, you can directly set the heater power in watts.
+- If INA226 present then controller will use PID control to maintain the setpoint watts.
+- If INA226 not present then controller will base adjust duty cycle for watts based on a calucated value from user entered resitance and live input voltage.
 - Use the rotary encoder to adjust the power level.
 
 

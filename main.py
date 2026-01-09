@@ -30,7 +30,7 @@ from utils import initialize_display, buzzer_play_tone, get_thermocouple_tempera
 #pid_tunings = 0.28, 0.0008, 0   #new heater + 6 coil + nichrome 4mm approx 0.7 ohms - 25% pwm limit - 47 watts meeasured 
 
 
-pid_tunings = 0.23, 0.003, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 ohms - with 2 x lipo batteries
+pid_tunings = 2.3, 0.03, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 ohms - with 2 x lipo batteries
 
 
 #add option for PWM mode so dial sets duty %  and ignore pid/temp (up to 300?) and just go in manual mode - show watts as we can work it out
@@ -208,7 +208,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         del shared_state.watt_readings[oldest_time]
     
     if heater.is_on():
-        shared_state.watts = int((((shared_state.input_volts*shared_state.input_volts) / shared_state.heater_resitance) * (shared_state.heater_max_duty_cycle_percent/100))  * (heater.get_power() / 10))
+        shared_state.watts = int((((shared_state.input_volts*shared_state.input_volts) / shared_state.heater_resitance) * (shared_state.heater_max_duty_cycle_percent/100))  * (heater.get_power() / 100))
         shared_state.watt_readings[utime.ticks_ms()] = shared_state.watts
     else:
         shared_state.watts = 0
@@ -218,9 +218,9 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         power = pid(shared_state.heater_temperature)  # Update pid even if heater is off
     else:
         pid.reset()  #better to move to where control state changes in inputhandler but pid is not in shared state so need to move there too
-        power = (shared_state.setwatts/shared_state.max_watts) * 10
+        power = (shared_state.setwatts/shared_state.max_watts) * 100
 
-    power = min(power , 10)  #Limit happening in heater set power but lets limit here too
+    power = min(power , 100)  #Limit happening in heater set power but lets limit here too
     
     if shared_state.get_mode() == "Off": 
         heater.off()
@@ -610,7 +610,7 @@ menu_system = MenuSystem(display_manager, shared_state)
 pid = PID(setpoint = shared_state.setpoint)
 #pid = PID(0.3, 0.9, 0.005, setpoint = shared_state.setpoint)
 # not sure if any value moving to shared state?
-pid.output_limits = (0, 10)
+pid.output_limits = (0, 100)
 
 
 

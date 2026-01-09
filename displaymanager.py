@@ -505,11 +505,11 @@ class DisplayManager:
         if self.shared_state.control == 'pid':
             p, i, d = pid_components
             if d > 0:
-                t = "{:.1f} {:.2f} {:.2f}".format(p, i, d)
+                t = "{:d} {:d} {:d}".format(int(p), int(i), int(d))
             else:
-                t = "{:.1f} {:.1f}".format(p, i)
+                t = "{:d} {:d}".format(int(p), int(i))
             if heater.is_on() and isinstance(heater, ElementHeater):
-                t = t + " P: " + "{:.1f}".format(heater.get_power())
+                t = t + " P: " + "{:.d}".format(int(heater.get_power()))
                 
             self.display.text(t, 0, 24)
 
