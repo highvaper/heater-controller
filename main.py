@@ -54,9 +54,9 @@ pid_tunings = 0.23, 0.003, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 oh
 # show watts use on display home screen? compare to power meter to see if its correct
 
 
-hardware_pin_red_led = 17   # inicate heater (manal or session) is activated 
-hardware_pin_green_led = 18 # indicate within 10C of setemp in session mode
-hardware_pin_blue_led = 19  # use to indicate in watts mode / flash a few times whenapproaching last 10 sec of session?
+hardware_pin_red_led = 17   # indicate within 10C of setemp in session mode
+hardware_pin_green_led = 18 # indicate heater (manual or session) is activated 
+hardware_pin_blue_led = 19  # indicate at start of last minute of a session
 
 hardware_pin_display_scl = 21
 hardware_pin_display_sda = 20

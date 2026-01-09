@@ -52,7 +52,6 @@ For element heater
     |---[GPIO 4] ----> [Rotary Encoder DT]
     |---[GPIO 14] ---> [Button]
     |
-    |---[GPIO 17] ---> [DS18X20 OneWire] //not really needed planned use to check on coil circuit temperatures
     |---[GPIO 16] ---> [Buzzer]
     |---[GPIO 21] ---> [SSD1306 SCL]
     |---[GPIO 20] ---> [SSD1306 SDA]
@@ -70,13 +69,6 @@ First setup Pi Pico setup with MicroPython in Thonny.
 https://www.raspberrypi.com/documentation/microcontrollers/micropython.html
 
 https://thonny.org/
-
-
-## Upload files from repository
-
-In Thonny, use the `Tools` > `Upload Files` option.
-
-For development or testing, it's simpler to copy and paste the contents of `main.py` directly into the interpreter window rather than copying the file itself.
 
 
 ## Operating Modes
@@ -120,6 +112,7 @@ For development or testing, it's simpler to copy and paste the contents of `main
 - **Red LED**: Within 10°C of setpoint in session mode.
 - **Blue LED**: Indicates near end of session.
 
+
 ## Usage
 
 1. Connect all hardware as described above.
@@ -127,6 +120,14 @@ For development or testing, it's simpler to copy and paste the contents of `main
 3. Run `main.py`.
 4. Use the rotary encoder and switches to navigate menus and set temperature or power.
 5. Monitor status via the OLED display and LEDs.
+
+
+
+## Upload files from repository
+
+In Thonny, use the `Tools` > `Upload Files` option.
+
+For development or testing, it's simpler to copy and paste the contents of `main.py` directly into the interpreter window rather than copying the file itself.
 
 ## Safety Notes
 
