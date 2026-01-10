@@ -1,9 +1,12 @@
+
 import utime
 import sys
 
 
 
+import machine
 from machine import ADC, Pin, I2C, Timer, WDT, PWM
+
 from ssd1306 import SSD1306_I2C
 
 import uasyncio as asyncio
@@ -89,7 +92,7 @@ hardware_pin_heater = 22
 def timerSetPiTemp(t):
     global pi_temperature_sensor, pidTimer, display_manager, heater, shared_state
    
-    shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor)
+    shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager)
     
     # Check if the temperature is safe
     if shared_state.pi_temperature > shared_state.pi_temperature_limit:
@@ -99,7 +102,7 @@ def timerSetPiTemp(t):
             while not shared_state.pi_temperature <= shared_state.pi_temperature_limit:
                 display_manager.display_error("pi-too_hot", 5) # Move display out of here?
                 
-                shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor)
+                shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager)
                 utime.sleep_ms(250)  # Warning shown for 5 secs so has had a time to cool down a bit
 
             pidTimer.start()
@@ -407,7 +410,7 @@ except Exception as e:
 
 # PI Temperature Sensor 
 pi_temperature_sensor = machine.ADC(4)
-shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor)
+shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager)
 
 
 # InputHandler

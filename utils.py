@@ -140,7 +140,7 @@ def apply_and_save_profile(profile_name, shared_state):
 
 
 
-def get_pi_temperature_or_handle_error(pi_temperature_sensor):
+def get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager):
     try:
         ADC_voltage = pi_temperature_sensor.read_u16() * (3.3 / (65536))
         pi_temperature = 27 - (ADC_voltage - 0.706) / 0.001721
