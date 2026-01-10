@@ -40,6 +40,16 @@ class InputHandler:
             self.rotary.set(range_mode=RotaryIRQ.RANGE_WRAP)
             self.shared_state.rotary_last_mode = "menu"
             print("setup rotarty menu" + str(self.rotary.value()))
+        elif self.shared_state.rotary_last_mode != "Profiles" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Profiles":
+            # Handle profile selection like show_settings
+            self.rotary.set(value=self.shared_state.profile_selection_index)
+            self.previous_rotary_value = self.shared_state.profile_selection_index
+            self.rotary.set(min_val=0)
+            max_profiles = len(self.shared_state.profile_list) - 1 if self.shared_state.profile_list else 0
+            self.rotary.set(max_val=max_profiles)
+            self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
+            self.shared_state.rotary_last_mode = "Profiles" 
+            print(f"setup rotary profiles: index={self.rotary.value()}, max={max_profiles}")
         elif self.shared_state.rotary_last_mode != "Display Contrast" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Display Contrast":
             self.rotary.set(value=self.shared_state.display_contrast)
             self.previous_rotary_value = self.shared_state.display_contrast
@@ -82,21 +92,30 @@ class InputHandler:
             self.shared_state.rotary_direction = direction
 
         else:
-            adjustment_rate = 10 if self.button_pressed else 0
-            if self.rotary.value() > self.previous_rotary_value:
-                self.rotary.set(value=self.rotary.value() + adjustment_rate)
+            # Not in menu - could be on a display screen like show_settings or profile
+            if self.shared_state.rotary_last_mode == "Profiles":
+                # Handle profile selection like show_settings
+                self.shared_state.profile_selection_index = self.rotary.value()
+            elif self.shared_state.rotary_last_mode == "Display Contrast":
+                # Display Contrast is already handled in set_power below
+                pass
             else:
-                self.rotary.set(value=(self.rotary.value() - adjustment_rate))
-            
-            if self.shared_state.menu_options[self.shared_state.current_menu_position] == "Display Contrast":
-                self.shared_state.display_contrast = self.rotary.value()
-            elif self.shared_state.menu_options[self.shared_state.current_menu_position] == "Show Settings":
-                self.shared_state.show_settings_line = self.rotary.value()
-            else:
-                if self.shared_state.control == 'watts':
-                    self.shared_state.setwatts = self.rotary.value()
+                # Regular setpoint/watts adjustment
+                adjustment_rate = 10 if self.button_pressed else 0
+                if self.rotary.value() > self.previous_rotary_value:
+                    self.rotary.set(value=self.rotary.value() + adjustment_rate)
                 else:
-                    self.shared_state.setpoint = self.rotary.value()
+                    self.rotary.set(value=(self.rotary.value() - adjustment_rate))
+                
+                if self.shared_state.menu_options[self.shared_state.current_menu_position] == "Display Contrast":
+                    self.shared_state.display_contrast = self.rotary.value()
+                elif self.shared_state.menu_options[self.shared_state.current_menu_position] == "Show Settings":
+                    self.shared_state.show_settings_line = self.rotary.value()
+                else:
+                    if self.shared_state.control == 'watts':
+                        self.shared_state.setwatts = self.rotary.value()
+                    else:
+                        self.shared_state.setpoint = self.rotary.value()
 
         self.previous_rotary_value = self.rotary.value()
         #print(f"{self.shared_state.rotary_last_mode} Prvious Rotary: {self.previous_rotary_value}, Rotary value: {self.rotary.value()}")
@@ -133,18 +152,21 @@ class InputHandler:
         if self.click_counter == 1:
             #print('Single click detected')
             if not self.shared_state.in_menu and not self.rotary_used:
-                #print(str(self.shared_state.session_start_time))
-                if self.shared_state.get_mode() == "Session":
+                # Handle profile selection click - just set flag, let main loop handle display
+                if self.shared_state.rotary_last_mode == "Profiles":
+                    self.shared_state.profile_load_pending = True
+                # Handle session extend in last minute
+                elif self.shared_state.get_mode() == "Session":
                     if (self.shared_state.session_timeout - self.shared_state.get_session_mode_duration()) < 60000:
                         self.shared_state.session_start_time = self.shared_state.session_start_time + self.shared_state.session_extend_time
 
         elif self.click_counter == 2:
-            #print('Double click detected')
+            print('Double click detected')
             if not self.shared_state.in_menu:
                 self.shared_state.in_menu = True
                 self.shared_state.rotary_direction = 'up' # Just Fake it and go to top of menu to force screen refresh
-            #else:
-                #print('Ignoring double click already in menu')
+            else:
+                print('Ignoring double click already in menu')
                 
         elif self.click_counter == 3:
             #print('Triple click detected')

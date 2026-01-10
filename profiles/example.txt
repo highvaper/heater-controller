@@ -1,0 +1,13 @@
+# Example Profile - Induction Heater Setup
+# When loaded, missing values will use defaults from shared_state
+
+setpoint=185
+
+# Heater coil resistance in ohms
+heater_resitance=0.49
+
+# Maximum watts limit for this heater
+max_watts=71
+
+# PID tuning for this specific heater setup (P,I,D)
+pid_tunings = 2.3,0.03,0

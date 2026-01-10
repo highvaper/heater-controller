@@ -9,27 +9,97 @@ from machine import ADC
 
 from errormessage import ErrorMessage #remove
 
-def load_config(file_path='config.txt'):  #not used at the moment need to load to different profiles to shared state
-    config = {}
+def load_profile(profile_name, shared_state):
+
+    # Start with defaults from SharedState.initialize_defaults()
+    config = shared_state.initialize_defaults()
+    
     try:
-        with open(file_path, 'r') as file:
+        with open('/profiles/' + profile_name +'.txt', 'r') as file:
             for line in file:
-                if line.strip() and not line.startswith('#'): # Ignore empty lines and comments
-                    key, value = line.strip().split('=')
-                    if key == 'session_timeout':
-                        config['session_timeout'] = int(value) * 1000 # Convert to milliseconds
-                    elif key == 'temperature_units':
-                        config['temperature_units'] = value
-                    elif key == 'setpoint':
-                        config['setpoint'] = int(value)
-                    elif key == 'power_threshold':
-                        config['power_threshold'] = int(value)
-                    elif key == 'heater_on_temperature_difference_threshold':
-                        config['heater_on_temperature_difference_threshold'] = int(value)
-                    # Add more elif statements for other configuration settings
+                if line.strip() and not line.startswith('#'):  # Ignore empty lines and comments
+                    parts = line.strip().split('=', 1)  # Split on first '=' only
+                    if len(parts) == 2:
+                        key, value = parts
+                        key = key.strip()
+                        value = value.strip()
+                        
+                        # Type conversion based on expected types
+                        try:
+                            if key in ['session_timeout', 'session_extend_time', 'setpoint', 'power_threshold',
+                                      'heater_on_temperature_difference_threshold', 'max_watts', 'click_check_timeout',
+                                      'max_allowed_setpoint', 'setwatts', 'lipo_count', 'pi_temperature_limit']:
+                                config[key] = int(value)
+                                if key == 'session_timeout':
+                                    config[key] = int(value) * 1000  # Convert to milliseconds
+                                elif key == 'session_extend_time':
+                                    config[key] = int(value) * 1000  # Convert to milliseconds
+                            elif key in ['heater_resitance', 'lipo_safe_volts', 'lead_safe_volts', 'mains_safe_volts']:
+                                config[key] = float(value)
+                            elif key in ['display_contrast']:
+                                config[key] = int(value)
+                            elif key in ['temperature_units', 'control', 'power_type']:
+                                config[key] = value
+                            elif key in ['display_rotate', 'session_reset_pid_when_near_setpoint']:
+                                config[key] = value.lower() in ['true', '1', 'yes']
+                            elif key == 'pid_tunings':
+                                # Parse PID tunings as comma-separated float values: P,I,D
+                                tunings_str = value.split(',')
+                                if len(tunings_str) == 3:
+                                    config[key] = (float(tunings_str[0].strip()), float(tunings_str[1].strip()), float(tunings_str[2].strip()))
+                                else:
+                                    print(f"Warning: pid_tunings must be in format 'P,I,D' (got: {value})")
+                        except (ValueError, TypeError) as e:
+                            print(f"Warning: Could not parse {key}={value}: {e}")
     except OSError as e:
-        print("Error opening or reading config file:", e)
+        print(f"Warning: Could not load profile '{profile_name}': {e}")
+    
     return config
+
+
+def list_profiles():
+    try:
+        import os
+        profiles = []
+        try:
+            # Try to list directory contents
+            for filename in os.listdir('/profiles/'):
+                if filename.endswith('.txt'):
+                    filename = filename[:-4]  # Remove .txt extension
+                    profiles.append(filename)
+            profiles.sort()
+            return profiles
+        except AttributeError:
+            return []
+    except Exception as e:
+        print(f"Error listing profiles: {e}")
+        return []
+
+
+def apply_and_save_profile(profile_name, shared_state):
+
+    if not profile_name:
+        return False, "No profile name provided"
+    
+    try:
+        print(f"Loading profile: {profile_name}")
+        config = load_profile(profile_name, shared_state)
+        shared_state.apply_profile(config)
+        shared_state.set_profile_name(profile_name)
+        
+        # Save as current profile
+        try:
+            with open('/current_profile.txt', 'w') as f:
+                f.write(profile_name)
+            print(f"Saved current profile: {profile_name}")
+        except OSError as e:
+            print(f"Warning: Could not save current profile: {e}")
+            return True, f"Profile loaded but not saved: {e}"
+        
+        return True, f"Loaded: {profile_name}"
+    except Exception as e:
+        print(f"Error loading profile: {e}")
+        return False, f"Error loading profile"
 
 
 

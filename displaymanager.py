@@ -58,24 +58,26 @@ class DisplayManager:
         else:
             self._heartbeat_task_obj = asyncio.get_event_loop().create_task(self._heartbeat_task(interval_ms))
 
-    async def _show_startup(self):
-        # original blocking startup screen but async-friendly
-        try:
-            self.display.fill(0)
+    #async def _show_startup(self):
+    #    # original blocking startup screen but async-friendly
+    #    try:
+    #        self.display.fill(0)
 
-            self.display.text('MicroPython',  self.get_centered_text_start_position('MicroPython'), 0, 1)
-            self.display.text('Heater', self.get_centered_text_start_position('Heater'), 8, 1)
-            self.display.text('Controller', self.get_centered_text_start_position('Controller'), 16, 1)
-            self.display.text('', self.get_centered_text_start_position(''), 24, 1)
-            self.display.show()
-        except Exception:
-            pass
-        await asyncio.sleep_ms(2000)
+    #        self.display.text('MicroPython',  self.get_centered_text_start_position('MicroPython'), 0, 1)
+    #        self.display.text('Heater', self.get_centered_text_start_position('Heater'), 8, 1)
+    #        self.display.text('Controller', self.get_centered_text_start_position('Controller'), 16, 1)
+    #        # Show currently loaded profile on last line
+    #        profile_text = f"Profile: {self.shared_state.profile}"
+    #        self.display.text(profile_text, self.get_centered_text_start_position(profile_text), 24, 1)
+    #        self.display.show()
+    #    except Exception:
+    #        pass
+    #    await asyncio.sleep_ms(2000)
 
-    def show_startup_screen(self):
-        loop = asyncio.get_event_loop()
-        loop.create_task(self._show_startup())
-        return
+    #def show_startup_screen(self):
+    #    loop = asyncio.get_event_loop()
+    #    loop.create_task(self._show_startup())
+    #    return
 
     async def _home_task_fn(self, pid_components_getter, heater, interval_ms=200):
         while True:
@@ -158,10 +160,7 @@ class DisplayManager:
             except Exception:
                 pass
 
-            if asyncio:
-                await asyncio.sleep_ms(scroll_speed)
-            else:
-                utime.sleep_ms(scroll_speed)
+            await asyncio.sleep_ms(scroll_speed)
 
         try:
             self.display.fill(0)
@@ -183,7 +182,9 @@ class DisplayManager:
         self.display.text('MicroPython',  self.get_centered_text_start_position('MicroPython'), 0, 1)
         self.display.text('Heater', self.get_centered_text_start_position('Heater'), 8, 1)
         self.display.text('Controller', self.get_centered_text_start_position('Controller'), 16, 1)
-        self.display.text('', self.get_centered_text_start_position(''), 24, 1)
+        profile_text = self.shared_state.profile
+        self.display.text(profile_text, self.get_centered_text_start_position(profile_text), 24, 1)
+
         self.display.show()
         utime.sleep_ms(2000) # Wait for 2 seconds to display the first set of messages
 
@@ -560,6 +561,37 @@ class DisplayManager:
 
         self.display.show()
 
+    
+    def show_screen_profiles(self):
+        self.display.fill(0)
+        
+        profile_list = self.shared_state.profile_list
+        if not profile_list:
+            self.display.text("No profiles", 0, 0, 1)
+            self.display.text("found", 0, 8, 1)
+            self.display.show()
+            return
+        
+        # Get current profile name
+        idx = self.shared_state.profile_selection_index
+        if idx >= len(profile_list):
+            idx = len(profile_list) - 1
+            self.shared_state.profile_selection_index = idx
+        
+        profile_name = profile_list[idx]
+        position_text = f"{idx + 1}/{len(profile_list)}"
+        #print("Profile:", profile_name, "Position:", position_text)
+        # Display profile name
+        display_text = f"{profile_name}"
+        
+        # Show on first line
+        self.display.text(display_text, 0, 0, 1)
+        
+        # Show position on second line  
+        self.display.text(position_text, 0, 8, 1)
+        
+        self.display.show()
+
 
     def show_screen_menu(self):
         #print("DisplayManager: show_screen_menu() called")
@@ -597,8 +629,8 @@ class DisplayManager:
         method_name = f"show_screen_{option}"
         method = getattr(self, method_name, None)
         if method:
-            # Keep graph-like screens displayed in a small async loop so they yield
-            graph_options = {'graph_bar', 'graph_line', 'graph_setpoint', 'temp_watts_line', 'watts_line'}
+            # Keep graph-like and interactive screens displayed in a small async loop so they yield
+            graph_options = {'graph_bar', 'graph_line', 'graph_setpoint', 'temp_watts_line', 'watts_line', 'profiles', 'show_settings'}
             #if asyncio and option in graph_options:
             if option in graph_options:
                 try:
@@ -609,6 +641,9 @@ class DisplayManager:
                             self._screen_task.cancel()
                     except Exception:
                         pass
+
+                    # Draw once immediately
+                    method()
 
                     async def _screen_loop():
                         while getattr(self.shared_state, 'current_menu_position', 1) > 1 and not getattr(self.shared_state, 'in_menu', False):

@@ -19,7 +19,8 @@ from menusystem import MenuSystem
 
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
-from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error
+from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile
+
 
 from shared_state import SharedState
 
@@ -35,7 +36,7 @@ from shared_state import SharedState
 #pid_tunings = 0.28, 0.0008, 0   #new heater + 6 coil + nichrome 4mm approx 0.7 ohms - 25% pwm limit - 47 watts meeasured 
 
 
-pid_tunings = 2.3, 0.03, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 ohms - with 2 x lipo batteries
+#pid_tunings = 2.3, 0.03, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 ohms - with 2 x lipo batteries
 
 
 #add option for PWM mode so dial sets duty %  and ignore pid/temp (up to 300?) and just go in manual mode - show watts as we can work it out
@@ -52,11 +53,6 @@ pid_tunings = 2.3, 0.03, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 ohms
 #also choose the correct profile automatically - ie know its battery or mains - get user to confirm  
 # - ie to then enable/diable battery check and also et preset pid values for each battery setup type or mains from profile
 
-
-#add new graphs:
-# voltage over time 
-# watts over time - should be able to work this out if we get the resitance as a constant and know the voltage - if we know the duty cylcle we should be able to work out the watts 
-# show watts use on display home screen? compare to power meter to see if its correct
 
 
 hardware_pin_red_led = 17   # indicate within 10C of setemp in session mode
@@ -300,6 +296,24 @@ print("Display initialised.")
 
 shared_state = SharedState(led_red_pin=led_red_pin, led_green_pin=led_green_pin, led_blue_pin=led_blue_pin)
 
+# Load profile list at startup (like show_settings loads all settings once)
+shared_state.profile_list = list_profiles()
+shared_state.profile_selection_index = 0
+
+# Load saved default profile if it exists
+try:
+    with open('/current_profile.txt', 'r') as f:
+        profile_name = f.readline().strip()
+    if profile_name:
+        print(f"Loading profile: {profile_name}")
+        config = load_profile(profile_name, shared_state)
+        shared_state.apply_profile(config)
+        shared_state.set_profile_name(profile_name)
+    else:
+        print("No profile name found in /current_profile.txt")
+except OSError:
+    print("No /current_profile.txt found, using default settings")
+
 #config = load_config(display)  # need to get config before displaymanager setup perhaps? so if error still need to show user
 #shared_state = SharedState(config)
  
@@ -427,9 +441,9 @@ menu_system = MenuSystem(display_manager, shared_state)
 #pid_tunings = (shared_state.setpoint * 0.005), (shared_state.setpoint * 0.0005), (shared_state.setpoint * 0.0001)
 #pid_tunings = (shared_state.setpoint * 0.006)/2, shared_state.setpoint * 0.00015,  shared_state.setpoint * 0.00005, 
 
-print(shared_state.pid.tunings)
-shared_state.pid.tunings = pid_tunings
-print(shared_state.pid.tunings)
+#print(shared_state.pid.tunings)
+#shared_state.pid.tunings = shared_state.pid_tunings
+#print(shared_state.pid.tunings)
 
 
 #read before trying to tune: http://brettbeauregard.com/blog/2017/06/introducing-proportional-on-measurement/
@@ -541,9 +555,21 @@ async def async_main():
             else:
                 # leaving home/menu selection - stop async home updates
                 display_manager.stop_home()
-                if shared_state.rotary_last_mode != shared_state.menu_options[shared_state.current_menu_position]:
-                    input_handler.setup_rotary_values()
-                menu_system.display_selected_option()
+                
+                # Check if user clicked on profiles screen to load a profile
+                if shared_state.rotary_last_mode == "Profiles" and shared_state.profile_load_pending:
+                    if shared_state.profile_list:
+                        profile_name = shared_state.profile_list[shared_state.profile_selection_index]
+                        success, message = apply_and_save_profile(profile_name, shared_state)
+                        #display_manager.display_error(message, 2, False)
+                    shared_state.profile_load_pending = False
+                    # Return to home screen
+                    shared_state.current_menu_position = 1
+                    shared_state.rotary_last_mode = None
+                else:
+                    if shared_state.rotary_last_mode != shared_state.menu_options[shared_state.current_menu_position]:
+                        input_handler.setup_rotary_values()
+                    menu_system.display_selected_option()
         else:
             # we're in the menu; ensure async home-screen updates are stopped
             display_manager.stop_home()
@@ -586,11 +612,12 @@ async def async_main():
                 watchdog.feed()
             except Exception:
                 pass
+        await asyncio.sleep_ms(70)
 
-        if asyncio:
-            await asyncio.sleep_ms(70)
-        else:
-            utime.sleep_ms(70)
+        #if asyncio:
+        #    await asyncio.sleep_ms(70)
+        #else:
+        #    utime.sleep_ms(70)
 
 
 if __name__ == '__main__':
@@ -601,33 +628,6 @@ if __name__ == '__main__':
         loop = asyncio.get_event_loop()
         loop.create_task(async_main())
         loop.run_forever()
-   
-#    current_time = utime.ticks_ms()
-#    elapsed_time = utime.ticks_diff(current_time, start_time)
-#    if elapsed_time >= 1000: 
-#        refresh_rate = iteration_count / (elapsed_time / 1000.0)
-#       # print("Refresh rate:", refresh_rate, "Hz")
-#        iteration_count = 0
-#        start_time = utime.ticks_ms()
 
-## Sort of a load average 
-#    for i in range(len(iteration_counts)):
-#        current_time = utime.ticks_ms()
-#        elapsed_time = utime.ticks_diff(current_time, start_times[i])
-#        if elapsed_time > 0 and elapsed_time >= period_durations[i]:
-#            refresh_rate = iteration_counts[i] / (elapsed_time / 1000.0)
-#            t = f"1s: {iteration_counts[0] / (utime.ticks_diff(utime.ticks_ms(), start_times[0]) / 1000.0):.2f} Hz, "
-#            t = t + f"5s: {iteration_counts[1] / (utime.ticks_diff(utime.ticks_ms(), start_times[1]) / 1000.0):.2f} Hz, "
-#            t = t + f"15s: {iteration_counts[2] / (utime.ticks_diff(utime.ticks_ms(), start_times[2]) / 1000.0):.2f} Hz"
-#            print(t)
-#            #print(f"{period_durations[i] / 1000}s average refresh rate: {refresh_rate} Hz")
-#            iteration_counts[i] = 0
-#            start_times[i] = utime.ticks_ms()
-#        else:
-#            iteration_counts[i] += 1
-#    #print(str(iteration_counts))
-
-
-    utime.sleep_ms(70)
 
 

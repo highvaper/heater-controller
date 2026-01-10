@@ -3,11 +3,7 @@ from simple_pid import PID
 
 class SharedState:
     def __init__(self, led_red_pin, led_green_pin, led_blue_pin):
-        # All of the below hard coded can be loaded from a file or similar 
-        # Need to add other stuff like butto click time, max temp, etc
-
-        #If more of these are added need to update line count in intputhandler for displing them
-        # Store hardware dependencies
+        self.led_red_pin = led_red_pin
         self.led_green_pin = led_green_pin
         self.led_blue_pin = led_blue_pin
         
@@ -42,9 +38,19 @@ class SharedState:
 
         self.heater_max_duty_cycle_percent = 0 #this now gets adjusted automatically based on max_watts / watt level
         self.input_volts = False  # Needs to be False at startup
+        
+        # PI Temperature monitoring
+        self.pi_temperature_limit = 60  # Shutdown if PI exceeds this temperature
+        
+        # PID Tuning - can be loaded from profile
+        self.pid_tunings = (2.3, 0.03, 0)  # (P, I, D) - example for 2x lipo batteries
+        
+        # Track which profile is currently loaded
+        self.profile = "default"  # Will be updated when a profile is loaded
        
         self.session_timeout = 7 * 60 * 1000       # length of time for a session before auto off (7 mins)
         self.session_extend_time = 2 * 60 * 1000   # length of time to extens senssion by when single click in last minute of session
+        self.session_reset_pid_when_near_setpoint = True # Reset PID stats once near setpoint to reduce overshoot
 
         
         # When in session mode and we first hist setpoint make led change colour ?  and / or sound a buzzer 
@@ -90,8 +96,9 @@ class SharedState:
         #Maybe make below options have more info eg:
         # setup_rotary_values in inputhandler 
         # options screen timeout to return to home (or none for graphs etc)
-        self.menu_options = ["MENU",
+        self.menu_options = [f"{self.profile}",
                              "Home Screen",
+                             "Profiles",
                              "Graph Setpoint",
                              "Graph Line",
                              "Graph Bar",
@@ -117,6 +124,10 @@ class SharedState:
         self.rotary_last_mode = None
 
         self.show_settings_line = 0  # for show settings in display to know what setting to show
+        
+        self.profile_list = []  # List of available profiles
+        self.profile_selection_index = 0  # Current profile selection in list
+        self.profile_load_pending = False  # Flag when user clicks to load profile
         
         self.session_start_time = 0
         self.session_setpoint_reached = False
@@ -166,3 +177,91 @@ class SharedState:
 
     def get_session_mode_duration(self):
         return utime.ticks_diff(utime.ticks_ms(), self.session_start_time)
+    
+    def apply_profile(self, profile_config):
+
+        # Update only the attributes that exist in the profile config
+        if 'session_timeout' in profile_config:
+            self.session_timeout = profile_config['session_timeout']
+        if 'session_extend_time' in profile_config:
+            self.session_extend_time = profile_config['session_extend_time']
+        if 'session_reset_pid_when_near_setpoint' in profile_config:
+            self.session_reset_pid_when_near_setpoint = profile_config['session_reset_pid_when_near_setpoint']
+        if 'temperature_units' in profile_config:
+            self.temperature_units = profile_config['temperature_units']
+        if 'setpoint' in profile_config:
+            self.setpoint = profile_config['setpoint']
+            self.pid.setpoint = self.setpoint  # Update PID setpoint too
+        if 'control' in profile_config:
+            self.control = profile_config['control']
+        if 'setwatts' in profile_config:
+            self.setwatts = profile_config['setwatts']
+        if 'power_type' in profile_config:
+            self.power_type = profile_config['power_type']
+        if 'lipo_count' in profile_config:
+            self.lipo_count = profile_config['lipo_count']
+        if 'lipo_safe_volts' in profile_config:
+            self.lipo_safe_volts = profile_config['lipo_safe_volts']
+        if 'lead_safe_volts' in profile_config:
+            self.lead_safe_volts = profile_config['lead_safe_volts']
+        if 'mains_safe_volts' in profile_config:
+            self.mains_safe_volts = profile_config['mains_safe_volts']
+        if 'power_threshold' in profile_config:
+            self.power_threshold = profile_config['power_threshold']
+        if 'heater_on_temperature_difference_threshold' in profile_config:
+            self.heater_on_temperature_difference_threshold = profile_config['heater_on_temperature_difference_threshold']
+        if 'max_watts' in profile_config:
+            self.max_watts = profile_config['max_watts']
+        if 'heater_resitance' in profile_config:
+            self.heater_resitance = profile_config['heater_resitance']
+        if 'display_contrast' in profile_config:
+            self.display_contrast = profile_config['display_contrast']
+        if 'display_rotate' in profile_config:
+            self.display_rotate = profile_config['display_rotate']
+        if 'click_check_timeout' in profile_config:
+            self.click_check_timeout = profile_config['click_check_timeout']
+        if 'max_allowed_setpoint' in profile_config:
+            self.max_allowed_setpoint = profile_config['max_allowed_setpoint']
+        if 'pi_temperature_limit' in profile_config:
+            self.pi_temperature_limit = profile_config['pi_temperature_limit']
+        if 'pid_tunings' in profile_config:
+            self.pid_tunings = profile_config['pid_tunings']
+            self.pid.tunings = self.pid_tunings  # Update PID tunings immediately
+        
+        print(f"Profile applied to SharedState")
+    
+    def set_profile_name(self, profile_name):
+        """Update the profile name and refresh menu_options display."""
+        self.profile = profile_name
+        # Update first menu option to show current profile
+        if self.menu_options:
+            self.menu_options[0] = f"{self.profile}"
+        print(f"Profile set to: {self.profile}")
+    
+    def initialize_defaults(self):
+        """Return a dictionary with all hardcoded default configuration values.
+        Used when loading profiles to ensure they start from a known baseline."""
+        return {
+            'session_timeout': 7 * 60 * 1000,
+            'session_extend_time': 2 * 60 * 1000,
+            'session_reset_pid_when_near_setpoint': True,
+            'temperature_units': 'C',
+            'setpoint': 165,
+            'control': 'pid',
+            'setwatts': 30,
+            'power_type': 'mains',
+            'lipo_count': 4,
+            'lipo_safe_volts': 3.3,
+            'lead_safe_volts': 12.0,
+            'mains_safe_volts': 28.0,
+            'power_threshold': 0,
+            'heater_on_temperature_difference_threshold': 20,
+            'max_watts': 75,
+            'heater_resitance': 0.49,
+            'display_contrast': 255,
+            'display_rotate': True,
+            'click_check_timeout': 800,
+            'max_allowed_setpoint': 250,
+            'pi_temperature_limit': 60,
+            'pid_tunings': (2.3, 0.03, 0),
+        }
