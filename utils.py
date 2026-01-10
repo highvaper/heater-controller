@@ -26,20 +26,57 @@ def load_profile(profile_name, shared_state):
                         
                         # Type conversion based on expected types
                         try:
-                            if key in ['session_timeout', 'session_extend_time', 'setpoint', 'power_threshold',
+                            # Handle new key names (map to old attribute names for compatibility)
+                            if key in ['session_timeout', 'session_extend_time', 'temperature_setpoint', 'power_threshold',
                                       'heater_on_temperature_difference_threshold', 'max_watts', 'click_check_timeout',
-                                      'max_allowed_setpoint', 'setwatts', 'lipo_count', 'pi_temperature_limit']:
+                                      'temperature_max_allowed_setpoint', 'setwatts', 'lipo_count', 'pi_temperature_limit']:
                                 config[key] = int(value)
                                 if key == 'session_timeout':
                                     config[key] = int(value) * 1000  # Convert to milliseconds
                                 elif key == 'session_extend_time':
                                     config[key] = int(value) * 1000  # Convert to milliseconds
+                                elif key == 'temperature_setpoint':
+                                    if int(value) > 0 and int(value) <= 300:
+                                        config[key] = int(value)
+                                    else:
+                                        print(f"Warning: temperature_setpoint out of range (1-300): {value}")
+                                elif key == 'temperature_max_allowed_setpoint':
+                                    if int(value) > 0 and int(value) <= 300:
+                                        config[key] = int(value)
+                                    else:
+                                        print(f"Warning: temperature_max_allowed_setpoint out of range (1-300): {value}")
+                                elif key == 'max_watts':
+                                    if int(value) > 0 and int(value) <= 150:
+                                        config[key] = int(value)
+                                    else:
+                                        print(f"Warning: max_watts out of range (1-150): {value}")
+                                elif key == 'setwatts':
+                                    if int(value) >= 0 and int(value) <= 150:
+                                        config[key] = int(value)
+                                    else:
+                                        print(f"Warning: setwatts out of range (0-150): {value}")
                             elif key in ['heater_resitance', 'lipo_safe_volts', 'lead_safe_volts', 'mains_safe_volts']:
                                 config[key] = float(value)
                             elif key in ['display_contrast']:
-                                config[key] = int(value)
-                            elif key in ['temperature_units', 'control', 'power_type']:
-                                config[key] = value
+                                if 0 <= int(value) <= 255:
+                                    config[key] = int(value)
+                                else:
+                                    print(f"Warning: display_contrast out of range (0-255): {value}")
+                            elif key in ['temperature_units']:
+                                if value in ['C', 'F']:
+                                    config[key] = value
+                                else:
+                                    print(f"Warning: temperature_units must be 'C' or 'F': {value}")
+                            elif key in ['control']:
+                                if value in ['temperature_pid', 'watts']:
+                                    config[key] = value
+                                else:
+                                    print(f"Warning: control mode must be 'temperature_pid' or 'watts': {value}")
+                            elif key in ['power_type']:
+                                if value in ['mains', 'lipo', 'lead']:
+                                    config[key] = value
+                                else:
+                                    print(f"Warning: power_type must be 'mains', 'lipo', or 'lead': {value}")
                             elif key in ['display_rotate', 'session_reset_pid_when_near_setpoint']:
                                 config[key] = value.lower() in ['true', '1', 'yes']
                             elif key == 'pid_tunings':

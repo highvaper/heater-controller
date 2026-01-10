@@ -7,15 +7,15 @@
 temperature_units=C
 
 # Target temperature setpoint: int (degrees)
-setpoint=165
+temperature_setpoint=165
 
 # Maximum allowed setpoint: int (degrees) - protects PTFE around thermocouple
-max_allowed_setpoint=250
+temperature_max_allowed_setpoint=250
 
-# Control mode: string ('pid' or 'watts')
-# - 'pid' uses PID controller with temperature setpoint
+# Control mode: string ('temperature_pid' or 'watts')
+# - 'temperature_pid' uses PID controller with temperature setpoint
 # - 'watts' uses fixed wattage
-control=pid
+control=temperature_pid
 
 # Fixed wattage level when control='watts': int (watts)
 setwatts=30
@@ -59,11 +59,11 @@ mains_safe_volts=28.0
 # ===== TIMING =====
 # Session timeout in seconds: int
 # Will be converted to milliseconds internally
-session_timeout=7
+session_timeout=420
 
 # Session extend time in seconds: int
 # Duration to extend session when user clicks in last minute
-session_extend_time=2
+session_extend_time=120
 
 # Click check timeout in milliseconds: int
 # Window for detecting multi-click inputs

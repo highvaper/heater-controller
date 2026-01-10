@@ -1,7 +1,7 @@
 # Example Profile - Induction Heater Setup
 # When loaded, missing values will use defaults from shared_state
 
-setpoint=185
+temperature_setpoint=185
 
 # Heater coil resistance in ohms
 heater_resitance=0.49

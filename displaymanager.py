@@ -279,7 +279,7 @@ class DisplayManager:
         last_temp_str = str(last_temp) + "C"
 
         # Draw dotted setpoint line
-        setpoint_y = self.display.height - int(self.shared_state.setpoint / 10) # Calculate the y-coordinate for the checkpoint
+        setpoint_y = self.display.height - int(self.shared_state.temperature_setpoint / 10) # Calculate the y-coordinate for the checkpoint
         dot_spacing = 4 # Adjust this value to change the spacing between dots
         for x in range(0, self.display.width, dot_spacing):
             self.display.pixel(x, setpoint_y, 1) 
@@ -302,7 +302,7 @@ class DisplayManager:
             self.display.show()
             return
 
-        setpoint = self.shared_state.setpoint
+        setpoint = self.shared_state.temperature_setpoint
         display_height = self.display.height
         zoom_range = 15 # This range is not used in the adjusted method
 
@@ -338,7 +338,7 @@ class DisplayManager:
 
         self.display.text(t, 0, 0, 1)
         
-        t = "SP:" + str(self.shared_state.setpoint) + "C"
+        t = "SP:" + str(self.shared_state.temperature_setpoint) + "C"
         self.display.text(t, 0, 24, 1)
         
         self.display.show()
@@ -396,7 +396,7 @@ class DisplayManager:
         last_temp_str = str(last_temp) + "C"
 
         # Draw dotted setpoint line
-        setpoint_y = self.display.height - int(self.shared_state.setpoint / 10) # Calculate the y-coordinate for the checkpoint
+        setpoint_y = self.display.height - int(self.shared_state.temperature_setpoint / 10) # Calculate the y-coordinate for the checkpoint
         dot_spacing = 4 # Adjust this value to change the spacing between dots
         for x in range(0, self.display.width, dot_spacing):
             self.display.pixel(x, setpoint_y, 1) 
@@ -434,7 +434,7 @@ class DisplayManager:
         last_watts_str = str(last_watt) + "W"
 
         # Draw dotted setpoint line
-#        setpoint_y = self.display.height - int(self.shared_state.setpoint / 10) # Calculate the y-coordinate for the checkpoint
+#        setpoint_y = self.display.height - int(self.shared_state.temperature_setpoint / 10) # Calculate the y-coordinate for the checkpoint
 #       dot_spacing = 4 # Adjust this value to change the spacing between dots
 #        for x in range(0, self.display.width, dot_spacing):
 #            self.display.pixel(x, setpoint_y, 1) 
@@ -480,9 +480,9 @@ class DisplayManager:
             self.display.text(t, 0, 8)
         else:
             if shared_state.temperature_units == 'F':
-                t = "T: " + str(int(32 + (1.8 * shared_state.heater_temperature))) + "F (" + str(int(32 + (1.8 * shared_state.setpoint))) + "F)"
+                t = "T: " + str(int(32 + (1.8 * shared_state.heater_temperature))) + "F (" + str(int(32 + (1.8 * shared_state.temperature_setpoint))) + "F)"
             else:
-                t = "T: " + str(int(shared_state.heater_temperature)) + "C (" + str(int(shared_state.setpoint)) + "C)"
+                t = "T: " + str(int(shared_state.heater_temperature)) + "C (" + str(int(shared_state.temperature_setpoint)) + "C)"
             self.display.text(t, 0, 0)
             t = "V: " + "{:.1f}".format(shared_state.input_volts) + "V"
             if isinstance(heater, ElementHeater):
@@ -503,7 +503,7 @@ class DisplayManager:
         #    t = "Mode: " + str(int(pi_temperature)) + "C"
         
         self.display.text(t, 0, 16)
-        if self.shared_state.control == 'pid':
+        if self.shared_state.control == 'temperature_pid':
             p, i, d = pid_components
             if d > 0:
                 t = "{:d} {:d} {:d}".format(int(p), int(i), int(d))

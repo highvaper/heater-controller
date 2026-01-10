@@ -115,8 +115,8 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
                                  #this needs a major clear up now we have share_state 
     global heater, thermocouple
 
-    if shared_state.pid.setpoint != shared_state.setpoint:
-        shared_state.pid.setpoint = shared_state.setpoint
+    if shared_state.pid.setpoint != shared_state.temperature_setpoint:
+        shared_state.pid.setpoint = shared_state.temperature_setpoint
     
     new_heater_temperature, need_heater_off_temperature = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager)
 
@@ -172,7 +172,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         shared_state.watts = 0
         shared_state.watt_readings[utime.ticks_ms()] = 0
 
-    if shared_state.control == 'pid': 
+    if shared_state.control == 'temperature_pid': 
         power = shared_state.pid(shared_state.heater_temperature)  # Update pid even if heater is off
     else:
         shared_state.pid.reset()  #better to move to where control state changes in inputhandler but pid is not in shared state so need to move there too
@@ -418,32 +418,6 @@ menu_system = MenuSystem(display_manager, shared_state)
 
 
 # PID
-#pid = PID( (shared_state.setpoint * 0.1), (shared_state.setpoint * 0.02), (shared_state.setpoint * 0.01), setpoint = shared_state.setpoint, auto_mode = False )
-# when setpoint = 100  common values (10%, 2%, 1%) 
-# possibly move to shared_state something like: initial_P, initial_I, initial_D?
-
-# Ziegler-Nichols method for a system with a fast response time
-#pid = PID(0.6, 1.2, 0.001, setpoint = shared_state.setpoint)
-
-# Auto PID starting values - seems to work well with element heater
-#pid = PID(setpoint = shared_state.setpoint)
-#pid = PID(0.3, 0.9, 0.005, setpoint = shared_state.setpoint)
-# not sure if any value moving to shared state?
-#pid.output_limits = (0, 100)
-
-
-
-#pid_tunings = 0.48, 0.006, 0.0001
-#0.005,0
-#0.00015
-
-
-#pid_tunings = (shared_state.setpoint * 0.005), (shared_state.setpoint * 0.0005), (shared_state.setpoint * 0.0001)
-#pid_tunings = (shared_state.setpoint * 0.006)/2, shared_state.setpoint * 0.00015,  shared_state.setpoint * 0.00005, 
-
-#print(shared_state.pid.tunings)
-#shared_state.pid.tunings = shared_state.pid_tunings
-#print(shared_state.pid.tunings)
 
 
 #read before trying to tune: http://brettbeauregard.com/blog/2017/06/introducing-proportional-on-measurement/
@@ -590,7 +564,7 @@ async def async_main():
             else:
                 pass
 
-        if shared_state.heater_temperature >= (shared_state.setpoint-8) and shared_state.heater_temperature <= (shared_state.setpoint+8):
+        if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8) and shared_state.heater_temperature <= (shared_state.temperature_setpoint+8):
             led_red_pin.on()
         else:
             led_red_pin.off()
@@ -601,7 +575,7 @@ async def async_main():
             else:
                 led_blue_pin.off()
             if shared_state.session_setpoint_reached == False:
-                if shared_state.heater_temperature >= (shared_state.setpoint-8):
+                if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
                     shared_state.session_setpoint_reached = True
                     buzzer_play_tone(buzzer, 1500, 350)
                     if shared_state.session_reset_pid_when_near_setpoint:

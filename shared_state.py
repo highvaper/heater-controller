@@ -9,14 +9,14 @@ class SharedState:
         
         self.temperature_units = 'C'       # Not tested F at all 
         
-        self.setpoint = 165     # Initial PID setpoint 
+        self.temperature_setpoint = 165     # Initial PID temperature setpoint 
 
         # PID controller
-        self.pid = PID(setpoint=self.setpoint)
+        self.pid = PID(setpoint=self.temperature_setpoint)
         self.pid.output_limits = (0, 100)
 
 
-        self.control = 'pid'
+        self.control = 'temperature-pid'
         #self.control = 'watts'
         self.setwatts = 30  # like setpoint but for watts
         
@@ -75,7 +75,7 @@ class SharedState:
         
         # Below is stuff perhaps better to leave alone
         self.click_check_timeout = 800 # ms timeout to multi click in 
-        self.max_allowed_setpoint = 250 # max allowed temperature - need to protect ptfe around thermocouple
+        self.temperature_max_allowed_setpoint = 250 # max allowed temperature - need to protect ptfe around thermocouple
         
 
         # below are controlled by internal processes dont mess with 
@@ -189,9 +189,9 @@ class SharedState:
             self.session_reset_pid_when_near_setpoint = profile_config['session_reset_pid_when_near_setpoint']
         if 'temperature_units' in profile_config:
             self.temperature_units = profile_config['temperature_units']
-        if 'setpoint' in profile_config:
-            self.setpoint = profile_config['setpoint']
-            self.pid.setpoint = self.setpoint  # Update PID setpoint too
+        if 'temperature-setpoint' in profile_config:
+            self.temperature_setpoint = profile_config['temperature-setpoint']
+            self.pid.setpoint = self.temperature_setpoint  # Update PID setpoint too
         if 'control' in profile_config:
             self.control = profile_config['control']
         if 'setwatts' in profile_config:
@@ -246,8 +246,8 @@ class SharedState:
             'session_extend_time': 2 * 60 * 1000,
             'session_reset_pid_when_near_setpoint': True,
             'temperature_units': 'C',
-            'setpoint': 165,
-            'control': 'pid',
+            'temperature_setpoint': 165,
+            'control': 'temperature_pid',
             'setwatts': 30,
             'power_type': 'mains',
             'lipo_count': 4,
@@ -261,7 +261,7 @@ class SharedState:
             'display_contrast': 255,
             'display_rotate': True,
             'click_check_timeout': 800,
-            'max_allowed_setpoint': 250,
+            'temperature_max_allowed_setpoint': 250,
             'pi_temperature_limit': 60,
             'pid_tunings': (2.3, 0.03, 0),
         }

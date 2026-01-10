@@ -76,10 +76,10 @@ class InputHandler:
                     self.rotary.set(min_val=0)
                     self.rotary.set(max_val=self.shared_state.max_watts)
                 else:
-                    self.rotary.set(value=self.shared_state.setpoint)
-                    self.previous_rotary_value = self.shared_state.setpoint
+                    self.rotary.set(value=self.shared_state.temperature_setpoint)
+                    self.previous_rotary_value = self.shared_state.temperature_setpoint
                     self.rotary.set(min_val=1)
-                    self.rotary.set(max_val=self.shared_state.max_allowed_setpoint)  # Max temp - allow conversion to F?
+                    self.rotary.set(max_val=self.shared_state.temperature_max_allowed_setpoint)  # Max temp - allow conversion to F?
                 
                 self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
                 self.shared_state.rotary_last_mode = "setpoint"
@@ -115,7 +115,7 @@ class InputHandler:
                     if self.shared_state.control == 'watts':
                         self.shared_state.setwatts = self.rotary.value()
                     else:
-                        self.shared_state.setpoint = self.rotary.value()
+                        self.shared_state.temperature_setpoint = self.rotary.value()
 
         self.previous_rotary_value = self.rotary.value()
         #print(f"{self.shared_state.rotary_last_mode} Prvious Rotary: {self.previous_rotary_value}, Rotary value: {self.rotary.value()}")
@@ -210,13 +210,15 @@ class InputHandler:
                 self.switch_control_button_pressed = False
                 
         if self.switch_control_button_pressed:
-            if self.shared_state.control == 'pid': 
+            if self.shared_state.control == 'temperature_pid': 
                 self.shared_state.control = 'watts'
                 self.rotary.set(value=self.shared_state.setwatts)
                 self.previous_rotary_value = self.shared_state.setwatts
             else:
-                self.shared_state.control = 'pid'
-                self.rotary.set(value=self.shared_state.setpoint)
-                self.previous_rotary_value = self.shared_state.setpoint
+                self.shared_state.control = 'temperature_pid'
+                self.rotary.set(value=self.shared_state.temperature_setpoint)
+                self.previous_rotary_value = self.shared_state.temperature_setpoint
+            # Force rotary_last_mode to None so setup_rotary_values will update the limits
+            self.shared_state.rotary_last_mode = None
             self.setup_rotary_values()
 
