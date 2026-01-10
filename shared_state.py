@@ -34,7 +34,7 @@ class SharedState:
         self.lead_safe_volts = 12.0 
         self.mains_safe_volts = 28.0 
 
-        self.heater_resitance = 0.4  #this should not change unless coils is replaced user needs to provide this value
+        self.heater_resitance = 0.49  #this should not change unless coils is replaced user needs to provide this value
 
         self.max_watts = 75 #135w for 0.6 ohm nichrome coil is about max before it starts to glow
                              #Note: 14 awg copper wire rated max amp is about 15amp - so at 12v = 180w max power to be safe
