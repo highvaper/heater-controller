@@ -177,6 +177,9 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
 
     if shared_state.control == 'temperature_pid': 
         power = shared_state.pid(shared_state.heater_temperature)  # Update pid even if heater is off
+    elif shared_state.control == 'duty_cycle':
+        shared_state.pid.reset()
+        power = shared_state.set_duty_cycle  # Use duty cycle directly (0-100%)
     else:
         shared_state.pid.reset()  #better to move to where control state changes in inputhandler but pid is not in shared state so need to move there too
         power = (shared_state.setwatts/shared_state.max_watts) * 100
@@ -566,23 +569,30 @@ async def async_main():
                 shared_state.rotary_direction = None
             else:
                 pass
-
+        #Need to make '8' in shared state so can be set via profile
         if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8) and shared_state.heater_temperature <= (shared_state.temperature_setpoint+8):
             led_red_pin.on()
         else:
             led_red_pin.off()
+
 
         if shared_state.get_mode() == "Session":
             if (shared_state.session_timeout - shared_state.get_session_mode_duration()) > 50000 and (shared_state.session_timeout - shared_state.get_session_mode_duration()) < 60000:
                 led_blue_pin.on()
             else:
                 led_blue_pin.off()
+            #Need to update below when we do watts_pid control
             if shared_state.session_setpoint_reached == False:
                 if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
                     shared_state.session_setpoint_reached = True
                     buzzer_play_tone(buzzer, 1500, 350)
                     if shared_state.session_reset_pid_when_near_setpoint:
                         shared_state.pid.reset()
+            else:
+                #Need to make '15' in shared state so can be set via profile
+                #need to catch runaway temp here after we have already reached setpointand reset pid stats 
+                if shared_state.heater_temperature > (shared_state.temperature_setpoint + 15):
+                    shared_state.pid.reset()
 
         if enable_watchdog:
             try:
@@ -590,12 +600,6 @@ async def async_main():
             except Exception:
                 pass
         await asyncio.sleep_ms(70)
-
-        #if asyncio:
-        #    await asyncio.sleep_ms(70)
-        #else:
-        #    utime.sleep_ms(70)
-
 
 if __name__ == '__main__':
 

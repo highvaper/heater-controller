@@ -16,9 +16,11 @@ class SharedState:
         self.pid.output_limits = (0, 100)
 
 
-        self.control = 'temperature-pid'
+        self.control = 'temperature_pid'
         #self.control = 'watts'
+        #self.control = 'duty_cycle'
         self.setwatts = 30  # like setpoint but for watts
+        self.set_duty_cycle = 50  # Duty cycle percentage (0-100%) when control='duty_cycle'
         
         
         self.power_type = 'mains'
@@ -62,7 +64,7 @@ class SharedState:
 
         #self.power_threshold = 5  #between pid.output_limits range (1-10)
         self.power_threshold = 0 #for slower sensors like DS18X20 probally lower is better 
-
+                
         # for the filtered tempterature when induction is on 
         # possibly needs adjusting for different coil sizes/current/voltages - 
         # maybe need way to reset this in the termocouple class if loading setting between reboots?
@@ -249,6 +251,7 @@ class SharedState:
             'temperature_setpoint': 165,
             'control': 'temperature_pid',
             'setwatts': 30,
+            'set_duty_cycle': 50,
             'power_type': 'mains',
             'lipo_count': 4,
             'lipo_safe_volts': 3.3,

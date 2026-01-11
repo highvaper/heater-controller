@@ -12,13 +12,17 @@ temperature_setpoint=165
 # Maximum allowed setpoint: int (degrees) - protects PTFE around thermocouple
 temperature_max_allowed_setpoint=250
 
-# Control mode: string ('temperature_pid' or 'watts')
+# Control mode: string ('temperature_pid', 'watts', or 'duty_cycle')
 # - 'temperature_pid' uses PID controller with temperature setpoint
-# - 'watts' uses fixed wattage
+# - 'watts' uses fixed wattage (0-max_watts)
+# - 'duty_cycle' uses direct duty cycle control (0-100%)
 control=temperature_pid
 
 # Fixed wattage level when control='watts': int (watts)
 setwatts=30
+
+# Duty cycle percentage when control='duty_cycle': int (0-100%)
+set_duty_cycle=10
 
 # ===== HEATER CONFIGURATION =====
 # Heater coil/element resistance in ohms: float

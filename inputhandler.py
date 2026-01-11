@@ -69,12 +69,18 @@ class InputHandler:
             print("setup rotarty show settings" + str(self.rotary.value()))
 
         else:
+            #need to update to temperature-setpoint and for when we have watts-pid control
             if self.shared_state.rotary_last_mode != "setpoint":
                 if self.shared_state.control == 'watts':
                     self.rotary.set(value=self.shared_state.setwatts)
                     self.previous_rotary_value = self.shared_state.setwatts
                     self.rotary.set(min_val=0)
                     self.rotary.set(max_val=self.shared_state.max_watts)
+                elif self.shared_state.control == 'duty_cycle':
+                    self.rotary.set(value=self.shared_state.set_duty_cycle)
+                    self.previous_rotary_value = self.shared_state.set_duty_cycle
+                    self.rotary.set(min_val=0)
+                    self.rotary.set(max_val=100)
                 else:
                     self.rotary.set(value=self.shared_state.temperature_setpoint)
                     self.previous_rotary_value = self.shared_state.temperature_setpoint
@@ -114,6 +120,8 @@ class InputHandler:
                 else:
                     if self.shared_state.control == 'watts':
                         self.shared_state.setwatts = self.rotary.value()
+                    elif self.shared_state.control == 'duty_cycle':
+                        self.shared_state.set_duty_cycle = self.rotary.value()
                     else:
                         self.shared_state.temperature_setpoint = self.rotary.value()
 
@@ -214,6 +222,10 @@ class InputHandler:
                 self.shared_state.control = 'watts'
                 self.rotary.set(value=self.shared_state.setwatts)
                 self.previous_rotary_value = self.shared_state.setwatts
+            elif self.shared_state.control == 'watts':
+                self.shared_state.control = 'duty_cycle'
+                self.rotary.set(value=self.shared_state.set_duty_cycle)
+                self.previous_rotary_value = self.shared_state.set_duty_cycle
             else:
                 self.shared_state.control = 'temperature_pid'
                 self.rotary.set(value=self.shared_state.temperature_setpoint)

@@ -29,7 +29,7 @@ def load_profile(profile_name, shared_state):
                             # Handle new key names (map to old attribute names for compatibility)
                             if key in ['session_timeout', 'session_extend_time', 'temperature_setpoint', 'power_threshold',
                                       'heater_on_temperature_difference_threshold', 'max_watts', 'click_check_timeout',
-                                      'temperature_max_allowed_setpoint', 'setwatts', 'lipo_count', 'pi_temperature_limit']:
+                                      'temperature_max_allowed_setpoint', 'setwatts', 'set_duty_cycle', 'lipo_count', 'pi_temperature_limit']:
                                 config[key] = int(value)
                                 if key == 'session_timeout':
                                     config[key] = int(value) * 1000  # Convert to milliseconds
@@ -55,6 +55,11 @@ def load_profile(profile_name, shared_state):
                                         config[key] = int(value)
                                     else:
                                         print(f"Warning: setwatts out of range (0-150): {value}")
+                                elif key == 'set_duty_cycle':
+                                    if int(value) >= 0 and int(value) <= 100:
+                                        config[key] = int(value)
+                                    else:
+                                        print(f"Warning: set_duty_cycle out of range (0-100): {value}")
                             elif key in ['heater_resitance', 'lipo_safe_volts', 'lead_safe_volts', 'mains_safe_volts']:
                                 config[key] = float(value)
                             elif key in ['display_contrast']:
@@ -71,7 +76,7 @@ def load_profile(profile_name, shared_state):
                                 if value in ['temperature_pid', 'watts']:
                                     config[key] = value
                                 else:
-                                    print(f"Warning: control mode must be 'temperature_pid' or 'watts': {value}")
+                                    print(f"Warning: control mode must be 'temperature_pid', 'watts', or 'duty_cycle': {value}")
                             elif key in ['power_type']:
                                 if value in ['mains', 'lipo', 'lead']:
                                     config[key] = value
@@ -123,7 +128,7 @@ def apply_and_save_profile(profile_name, shared_state):
         config = load_profile(profile_name, shared_state)
         shared_state.apply_profile(config)
         shared_state.set_profile_name(profile_name)
-        
+        shared_state.pid.reset() 
         # Save as current profile
         try:
             with open('/current_profile.txt', 'w') as f:

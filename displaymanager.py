@@ -478,6 +478,15 @@ class DisplayManager:
             else:
                 t = t + " T: " + str(int(shared_state.heater_temperature)) + "C"
             self.display.text(t, 0, 8)
+        elif self.shared_state.control == 'duty_cycle':
+            t = "DC: " + str(heater.get_power()) + "% (" + str(shared_state.set_duty_cycle) + "%)"
+            self.display.text(t, 0, 0)
+            t = "V: " + "{:.1f}".format(shared_state.input_volts) + "V"
+            if shared_state.temperature_units == 'F':
+                t = t + " T: " + str(int(32 + (1.8 * shared_state.heater_temperature))) + "F"
+            else:
+                t = t + " T: " + str(int(shared_state.heater_temperature)) + "C"
+            self.display.text(t, 0, 8)
         else:
             if shared_state.temperature_units == 'F':
                 t = "T: " + str(int(32 + (1.8 * shared_state.heater_temperature))) + "F (" + str(int(32 + (1.8 * shared_state.temperature_setpoint))) + "F)"
