@@ -95,11 +95,9 @@ class ElementHeater(BaseHeater):
         print("ElementHeater initialised.")
 
     def on(self, power=100): # Default to full power (now 100)
-        duty_cycle = int(power * 655.35)
-        duty_cycle = min(duty_cycle, self.max_duty_cycle)
-        #print(duty_cycle)
-        self.pwm.duty_u16(duty_cycle)
         self._is_on = True
+        self.set_power(power)
+
 
     def off(self):
         self.pwm.duty_u16(0) # Set PWM duty cycle to 0 (off)
@@ -107,8 +105,10 @@ class ElementHeater(BaseHeater):
 
     def set_max_duty_cycle(self, max_duty_cycle_percent):
         self.max_duty_cycle = int(65535 * (max_duty_cycle_percent / 100)) 
+        self.max_duty_cycle_percent = max_duty_cycle_percent
 
     def set_power(self, power):
+        power = min(power, self.max_duty_cycle_percent)
         duty_cycle = int(power * 655.35)
         duty_cycle = min(duty_cycle, self.max_duty_cycle)
         #print(duty_cycle)
