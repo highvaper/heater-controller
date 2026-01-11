@@ -156,6 +156,11 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         oldest_time = min(shared_state.temperature_readings.keys())
         del shared_state.temperature_readings[oldest_time]
     shared_state.temperature_readings[utime.ticks_ms()] = int(shared_state.heater_temperature)
+    
+    # Cache min/max for display optimization
+    if shared_state.temperature_readings:
+        shared_state.temperature_min_time = min(shared_state.temperature_readings.keys())
+        shared_state.temperature_max_time = max(shared_state.temperature_readings.keys())
 
     if len(shared_state.input_volts_readings) >= 128: 
         oldest_time = min(shared_state.input_volts_readings.keys())
@@ -176,6 +181,11 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     else:
         shared_state.watts = 0
         shared_state.watt_readings[utime.ticks_ms()] = 0
+    
+    # Cache min/max for display optimization
+    if shared_state.watt_readings:
+        shared_state.watt_min_time = min(shared_state.watt_readings.keys())
+        shared_state.watt_max_time = max(shared_state.watt_readings.keys())
 
     if shared_state.control == 'temperature_pid': 
         power = shared_state.pid(shared_state.heater_temperature)  # Update pid even if heater is off

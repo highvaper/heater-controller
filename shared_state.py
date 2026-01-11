@@ -94,6 +94,12 @@ class SharedState:
         self.watt_readings = {}
         self.watts = 0
         
+        # Cache min/max time values for display optimization
+        self.temperature_min_time = 0
+        self.temperature_max_time = 0
+        self.watt_min_time = 0
+        self.watt_max_time = 0
+        
         self.pi_temperature = 0         # PI Pico chip temperature
         self.pi_temperature_limit = 60  # Maybe place pico board above/next to mosfet module so we get some idea hot its getting 
 

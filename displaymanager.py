@@ -215,9 +215,9 @@ class DisplayManager:
         if temp_range == 0: temp_range = 1
         display_height = self.display.height
 
-        # Calculate min and max times once
-        min_time = min(temperature_readings.keys())
-        max_time = max(temperature_readings.keys())
+        # Use cached min and max times
+        min_time = self.shared_state.temperature_min_time
+        max_time = self.shared_state.temperature_max_time
         x_range = max_time - min_time
         if x_range == 0: x_range = 1
         
@@ -261,8 +261,8 @@ class DisplayManager:
             self.display.show()
             return
 
-        min_time = min(temperature_readings.keys())
-        max_time = max(temperature_readings.keys())
+        min_time = self.shared_state.temperature_min_time
+        max_time = self.shared_state.temperature_max_time
         x_range = max_time - min_time
         if x_range == 0: x_range = 1
 
@@ -309,7 +309,7 @@ class DisplayManager:
         setpoint_y = display_height // 2 # Setpoint is in the middle of the screen
 
         for time, temp in temperature_readings.items():
-            x = int((time - min(temperature_readings.keys())) * (self.display.width / (max(temperature_readings.keys()) - min(temperature_readings.keys()))))
+            x = int((time - self.shared_state.temperature_min_time) * (self.display.width / (self.shared_state.temperature_max_time - self.shared_state.temperature_min_time)))
             # Calculate the y-coordinate relative to the setpoint
             y = (setpoint_y + (temp - setpoint) * -1)
             # Ensure y-coordinate does not go below 0 or above the display height
@@ -359,15 +359,15 @@ class DisplayManager:
             self.display.show()
             return
 
-        min_time = min(watt_readings.keys())
-        max_time = max(watt_readings.keys())
-        x_range = max_time - min_time
+        watt_min_time = self.shared_state.watt_min_time
+        watt_max_time = self.shared_state.watt_max_time
+        x_range = watt_max_time - watt_min_time
         if x_range == 0: x_range = 1
 
         x_scale = self.display.width / x_range
         y_scale = self.shared_state.max_watts / self.display.height
         for time, watt in watt_readings.items():
-            x = int((time - min_time) * x_scale)
+            x = int((time - watt_min_time) * x_scale)
             y = self.display.height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
 
             # Draw a single pixel for each watt reading
@@ -377,15 +377,15 @@ class DisplayManager:
         last_watts_str = str(last_watt) + "W"
 
 
-        min_time = min(temperature_readings.keys())
-        max_time = max(temperature_readings.keys())
-        x_range = max_time - min_time
+        temp_min_time = self.shared_state.temperature_min_time
+        temp_max_time = self.shared_state.temperature_max_time
+        x_range = temp_max_time - temp_min_time
         if x_range == 0: x_range = 1
 
         x_scale = self.display.width / x_range
 
         for time, temp in temperature_readings.items():
-            x = int((time - min_time) * x_scale)
+            x = int((time - temp_min_time) * x_scale)
             y = self.display.height - int(temp / 10) # Adjust the y-coordinate to represent each pixel as 10°C
 
             # Draw a dotted line
@@ -416,8 +416,8 @@ class DisplayManager:
             self.display.show()
             return
 
-        min_time = min(watt_readings.keys())
-        max_time = max(watt_readings.keys())
+        min_time = self.shared_state.watt_min_time
+        max_time = self.shared_state.watt_max_time
         x_range = max_time - min_time
         if x_range == 0: x_range = 1
 
