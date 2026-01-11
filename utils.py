@@ -7,8 +7,6 @@ from ssd1306 import SSD1306_I2C
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 from machine import ADC
 
-from errormessage import ErrorMessage #remove
-
 def load_profile(profile_name, shared_state):
 
     # Start with defaults from SharedState.initialize_defaults()
@@ -145,7 +143,7 @@ def apply_and_save_profile(profile_name, shared_state):
 
 
 
-def get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager):
+def get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager, shared_state=None):
     try:
         ADC_voltage = pi_temperature_sensor.read_u16() * (3.3 / (65536))
         pi_temperature = 27 - (ADC_voltage - 0.706) / 0.001721
@@ -153,12 +151,13 @@ def get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager):
     except Exception as e:
         error_message = str(e)
         print("Error reading PI temperature: " + error_message)
-        display_manager.display_error("pi-unknown_error:" + error_message,10,True) # need to move out of this?
+        if shared_state:
+            shared_state.set_error("pi-unknown_error", "PI temperature read error: " + error_message)
         #while True:
          #   utime.sleep_ms(1000)
     return pi_temperature
 
-def get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager):
+def get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state=None):
 
     try:
 
@@ -167,32 +166,34 @@ def get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer,
         elif isinstance(heater, ElementHeater):
             new_temperature = thermocouple.read_raw_temp()
             need_off_temperature = False  # caller can throw this away if not needed
+            
+            # Check if an error was set during read
+            if shared_state and shared_state.has_error():
+                error_code, error_message = shared_state.current_error
+                if error_code in ["thermocouple-invalid_reading", "thermocouple-zero_reading", "thermocouple-below_zero"]:
+                    heater.off()
+                    if pidTimer.is_timer_running():
+                        pidTimer.stop()
+                    print("Stopped heater - " + error_message)
+                    # Don't return yet, let the error display in main loop
+                    return -1, True
+                elif error_code in ["thermocouple-above_limit", "thermocouple-read_error"]:
+                    heater.off()
+                    print("Pausing heater - " + error_message)
+                    return -1, True
         else:
             raise ValueError("Unsupported heater type")
         return new_temperature, need_off_temperature
     
     except Exception as e:
         error_message = str(e)
-        if "invalid_reading" in error_message or "zero_reading" in error_message or "below_zero" in error_message:
-            heater.off()
-            if pidTimer.is_timer_running():
-                pidTimer.stop()
-            print("Stopped heater - " + error_message)
-            while True:
-                display_manager.display_error("thermocouple-error:" + error_message)
-                utime.sleep_ms(500)
-        elif "above_limit" in error_message or "read_error" in error_message:
-            heater.off()
-            print("Pausing heater - " + error_message)
-            return -1, True
-        else:
-            heater.off()
-            if pidTimer.is_timer_running():
-                pidTimer.stop()
-            print("Stopped heater - Unknown Error: " + error_message)
-            while True:
-                display_manager.display_error("unknown_error:" + error_message)
-                utime.sleep_ms(500)
+        heater.off()
+        if pidTimer.is_timer_running():
+            pidTimer.stop()
+        print("Stopped heater - Unknown Error: " + error_message)
+        if shared_state:
+            shared_state.set_error("unknown-error", error_message)
+        return -1, True
                 
 def initialize_display(i2c_scl, i2c_sda, led_pin):
     

@@ -45,8 +45,8 @@ class DisplayManager:
     async def _heartbeat_task(self, interval_ms=70):
         while True:
             try:
-                # Only draw heartbeat on the home screen and when not in the menu
-                if (not getattr(self.shared_state, 'in_menu', False)) and (getattr(self.shared_state, 'current_menu_position', 1) == 1):
+                # Only draw heartbeat on the home screen and when not in the menu, and no errors showing
+                if (not getattr(self.shared_state, 'in_menu', False)) and (getattr(self.shared_state, 'current_menu_position', 1) == 1) and (not self.shared_state.has_error()):
                     self.display_heartbeat()
             except Exception:
                 pass
@@ -58,28 +58,8 @@ class DisplayManager:
         else:
             self._heartbeat_task_obj = asyncio.get_event_loop().create_task(self._heartbeat_task(interval_ms))
 
-    #async def _show_startup(self):
-    #    # original blocking startup screen but async-friendly
-    #    try:
-    #        self.display.fill(0)
 
-    #        self.display.text('MicroPython',  self.get_centered_text_start_position('MicroPython'), 0, 1)
-    #        self.display.text('Heater', self.get_centered_text_start_position('Heater'), 8, 1)
-    #        self.display.text('Controller', self.get_centered_text_start_position('Controller'), 16, 1)
-    #        # Show currently loaded profile on last line
-    #        profile_text = f"Profile: {self.shared_state.profile}"
-    #        self.display.text(profile_text, self.get_centered_text_start_position(profile_text), 24, 1)
-    #        self.display.show()
-    #    except Exception:
-    #        pass
-    #    await asyncio.sleep_ms(2000)
-
-    #def show_startup_screen(self):
-    #    loop = asyncio.get_event_loop()
-    #    loop.create_task(self._show_startup())
-    #    return
-
-    async def _home_task_fn(self, pid_components_getter, heater, interval_ms=200):
+    async def _home_task_fn(self, heater, interval_ms=200):
         while True:
             try:
                 # Do not draw home screen while menu is active
@@ -88,19 +68,18 @@ class DisplayManager:
                     await asyncio.sleep_ms(interval_ms)
                     continue
 
-                comps = pid_components_getter()
-                self.show_screen_home_screen(comps, heater)
+                self.show_screen_home_screen(heater)
             except Exception:
                 pass
             await asyncio.sleep_ms(interval_ms)
 
-    def start_home(self, pid_components_getter, heater, loop=None, interval_ms=200):
+    def start_home(self, heater, loop=None, interval_ms=200):
         if self._home_task is not None:
             return
         try:
             if loop is None:
                 loop = asyncio.get_event_loop()
-            self._home_task = loop.create_task(self._home_task_fn(pid_components_getter, heater, interval_ms))
+            self._home_task = loop.create_task(self._home_task_fn(heater, interval_ms))
         except Exception:
             self._home_task = None
 
@@ -130,51 +109,6 @@ class DisplayManager:
             self.display.invert(False)
 
 
-    async def _display_error(self, message, duration=5, show_countdown=False):
-        message_length = len(message) * 8 # Assuming each character is 8 pixels wide
-        start_time = utime.ticks_ms()
-        scroll_speed = 20 # Time in milliseconds to wait before moving to the next character
-        message_scroll_position = 0
-        message_display_time = (message_length + (128*8)) * scroll_speed # Total time to display the message
-
-        while utime.ticks_diff(utime.ticks_ms(), start_time) < message_display_time:
-            try:
-                self.display.fill(0) # Clear the display
-
-                # Scrolling logic for the message
-                self.display.text(message, message_scroll_position, 12, 1)
-                message_scroll_position -= 1
-                if message_scroll_position < -message_length:
-                    message_scroll_position = 128
-
-                if show_countdown:
-                    elapsed_time = utime.ticks_diff(utime.ticks_ms(), start_time) / 1000 # Convert to seconds
-                    remaining_time = duration - elapsed_time
-                    countdown_text = f"{int(remaining_time)}s"
-                    countdown_length = len(countdown_text) * 8 
-                    # Calculate the starting position for the countdown to center it
-                    countdown_start_position = (128 - countdown_length) // 2
-                    self.display.text(countdown_text, countdown_start_position, 24, 1)
-
-                self.display.show()
-            except Exception:
-                pass
-
-            await asyncio.sleep_ms(scroll_speed)
-
-        try:
-            self.display.fill(0)
-            self.display.show()
-        except Exception:
-            pass
-
-
-    def display_error(self, message, duration=5, show_countdown=False):
-        loop = asyncio.get_event_loop()
-        loop.create_task(self._display_error(message, duration, show_countdown))
-        return
-
-
     def show_startup_screen(self):
         # Clear the display and show the first set of messages
         self.display.fill(0) 
@@ -197,6 +131,42 @@ class DisplayManager:
         self.display.text('OFF', self.get_centered_text_start_position('OFF'), 16, 1)
         self.display.show()
         utime.sleep_ms(2000) # Wait for 2 seconds to display the first set of messages
+
+    def show_error(self):
+        """Display current error on screen."""
+        if not self.shared_state.has_error():
+            return
+        
+        error_code, error_message = self.shared_state.current_error
+        self.display.fill(0)
+        
+        # Display error code
+        self.display.text("ERROR", self.get_centered_text_start_position("ERROR"), 0, 1)
+        
+        # Display error message with word wrapping
+        max_lines = 3
+        chars_per_line = 16
+        words = error_message.split()
+        lines = []
+        current_line = ""
+        
+        for word in words:
+            if len(current_line) + len(word) + 1 <= chars_per_line:
+                current_line += " " + word if current_line else word
+            else:
+                lines.append(current_line)
+                current_line = word
+                if len(lines) >= max_lines:
+                    break
+        
+        if current_line and len(lines) < max_lines:
+            lines.append(current_line)
+        
+        for i, line in enumerate(lines):
+            if i < max_lines:
+                self.display.text(line, 0, 8 + (i * 8), 1)
+        
+        self.display.show()
 
     def show_screen_graph_bar(self):
 
@@ -465,7 +435,7 @@ class DisplayManager:
         return (display_width - text_width) // 2
 
 
-    def show_screen_home_screen(self, pid_components, heater):
+    def show_screen_home_screen(self, heater):
         self.display.fill(0)
         shared_state = self.shared_state
 
@@ -513,7 +483,7 @@ class DisplayManager:
         
         self.display.text(t, 0, 16)
         if self.shared_state.control == 'temperature_pid':
-            p, i, d = pid_components
+            p, i, d = self.shared_state.pid.components
             if d > 0:
                 t = "{:d} {:d} {:d}".format(int(p), int(i), int(d))
             else:

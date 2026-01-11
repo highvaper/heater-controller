@@ -144,12 +144,23 @@ class SharedState:
         self.session_reset_pid_when_near_setpoint = True # Seems to help improve overshoot reduction by resetting pid stats once near setpoint from cold
         self._mode = "Off" 
 
-        self.error_messages = {"display-setup":      "Error initializing display, cannout continue",
-                       "heater-too_hot":     "Heater too hot > 300C",
+        # Error tracking (simpler approach without exceptions)
+        self.current_error = None  # Tuple of (error_code, error_message) or None
+        self.last_error_time = 0
+        self.error_display_timeout = 5000  # Display error for 5 seconds
+        
+        # Error message descriptions (reference only)
+        self.error_messages = {"display-setup":      "Error initializing display, cannot continue",
+                       "heater-too_hot":     "Heater too hot",
                        "battery_level-too-low": "Battery too low",
-                       "unknown-power-type": "Unknwon power type",
-                       "mains-voltage-too-high": "Mains voltage too high",
-                       "pi-too_hot":         "PI too hot > 60C"
+                       "unknown-power-type": "Unknown power type",
+                       "mains-voltage-too-high": "Mains voltage too high " + str(self.mains_safe_volts) + "V",
+                       "pi-too_hot":         "PI too hot > " + str(self.pi_temperature_limit) + "C",
+                       "thermocouple-read_error": "Thermocouple read error",
+                       "thermocouple-invalid_reading": "Invalid thermocouple reading",
+                       "thermocouple-zero_reading": "Thermocouple zero reading",
+                       "thermocouple-below_zero": "Temperature below zero",
+                       "thermocouple-above_limit": "Temperature above limit"
         }
 
 
@@ -160,6 +171,9 @@ class SharedState:
             self.led_blue_pin.off()  # In case session manually ended when light on
             self._mode = "Off"  # Set off here rather than after playing sounds as this can get called again while sounds being played
             self.session_setpoint_reached = False
+            # Clear heater-too_hot error when session ends
+            if self.current_error and self.current_error[0] == "heater-too_hot":
+                self.clear_error()
 #            buzzer_play_tone(buzzer, 1500, 200)
 #            utime.sleep_ms(200)
 #            buzzer_play_tone(buzzer, 1000, 200)
@@ -180,6 +194,9 @@ class SharedState:
         if new_mode == "Off":
             self.led_blue_pin.off() # In case session manually ended when light on
             self.led_green_pin.off()
+            # Clear heater-too_hot error when turning off the heater
+            if self.current_error and self.current_error[0] == "heater-too_hot":
+                self.clear_error()
         else:
             self.led_green_pin.on()
             self.pid.reset()
@@ -187,6 +204,24 @@ class SharedState:
 
     def get_session_mode_duration(self):
         return utime.ticks_diff(utime.ticks_ms(), self.session_start_time)
+    
+    def set_error(self, error_code, error_message=None):
+        """Set current error state. Pass None to clear error."""
+        if error_code is None:
+            self.current_error = None
+            return
+        if error_message is None:
+            error_message = self.error_messages.get(error_code, "Unknown error")
+        self.current_error = (error_code, error_message)
+        self.last_error_time = utime.ticks_ms()
+    
+    def has_error(self):
+        """Check if there's an active error."""
+        return self.current_error is not None
+    
+    def clear_error(self):
+        """Clear current error."""
+        self.current_error = None
     
     def apply_profile(self, profile_config):
 

@@ -1,20 +1,11 @@
 from machine import Pin
 from max6675_utime import MAX6675
 
-from errormessage import ErrorMessage
-
 class Thermocouple:
-
-    THERMOCOUPLE_ERROR_MESSAGES = {
-        "thermocouple-setup":           "Error setting up thermocouple, cannot continue",
-        "thermocouple-read_error":      "Error with the thermocouple read - Check it is not damaged or loosely connected",
-        "thermocouple-invalid_reading": "Invalid temperature reading",
-        "thermocouple-zero_reading":    "Temperature reading is 0 - Check the MAX6675 is correctly wired",
-        "thermocouple-below_zero":      "Temperature reading is below 0C - Check the probe is not wired up backwards",
-        "thermocouple-above_limit":     "Temperature reading is over 1000C - Check the probe for shorting"
-    }
-    def __init__(self, sck_pin_number, cs_pin_number, so_pin_number, heater_on_temperature_difference_threshold):
+    def __init__(self, sck_pin_number, cs_pin_number, so_pin_number, heater_on_temperature_difference_threshold, shared_state=None):
         print("Thermocouple Initialising ...")
+        
+        self.shared_state = shared_state
 
         self.sck = Pin(sck_pin_number, Pin.OUT)
         self.cs = Pin(cs_pin_number, Pin.OUT)
@@ -31,7 +22,10 @@ class Thermocouple:
             #self.update_filtered_temp(False) # Initialize last_known_safe_temp
             print("Thermocouple initialised.")
         except Exception as e:
-            error_text = self.THERMOCOUPLE_ERROR_MESSAGES["thermocouple-setup"] + ": " + str(e)
+            error_msg = self.shared_state.error_messages.get("thermocouple-setup", "Thermocouple setup error") if self.shared_state else "Thermocouple setup error"
+            error_text = error_msg + ": " + str(e)
+            if self.shared_state:
+                self.shared_state.set_error("thermocouple-setup", error_text)
             # Optionally, handle the error further or re-raise it
             raise
 
@@ -40,20 +34,41 @@ class Thermocouple:
         try:
             raw_temp = self.thermocouple_sensor.read()
             if self.thermocouple_sensor.error():
-                raise ErrorMessage("thermocouple-read_error",self.THERMOCOUPLE_ERROR_MESSAGES["thermocouple-read_error"])
+                error_msg = self.shared_state.error_messages.get("thermocouple-read_error", "Thermocouple read error") if self.shared_state else "Thermocouple read error"
+                if self.shared_state:
+                    self.shared_state.set_error("thermocouple-read_error", error_msg)
+                return None
             if raw_temp is None:
-                raise ErrorMessage("thermocouple-invalid_reading",self.THERMOCOUPLE_ERROR_MESSAGES["thermocouple-invalid_reading"])
+                error_msg = self.shared_state.error_messages.get("thermocouple-invalid_reading", "Invalid reading") if self.shared_state else "Invalid reading"
+                if self.shared_state:
+                    self.shared_state.set_error("thermocouple-invalid_reading", error_msg)
+                return None
             if raw_temp == 0:
-                raise ErrorMessage("thermocouple-zero_reading",self.THERMOCOUPLE_ERROR_MESSAGES["thermocouple-zero_reading"] + " " + str(raw_temp))
+                base_msg = self.shared_state.error_messages.get("thermocouple-zero_reading", "Zero reading") if self.shared_state else "Zero reading"
+                error_msg = base_msg + " " + str(raw_temp)
+                if self.shared_state:
+                    self.shared_state.set_error("thermocouple-zero_reading", error_msg)
+                return None
             if raw_temp < 0:
-                raise ErrorMessage("thermocouple-below_zero",self.THERMOCOUPLE_ERROR_MESSAGES["thermocouple-below_zero"] + " " + str(raw_temp))
+                base_msg = self.shared_state.error_messages.get("thermocouple-below_zero", "Below zero") if self.shared_state else "Below zero"
+                error_msg = base_msg + " " + str(raw_temp)
+                if self.shared_state:
+                    self.shared_state.set_error("thermocouple-below_zero", error_msg)
+                return None
             if raw_temp > 1000:
-                raise ErrorMessage("thermocouple-above_limit",self.THERMOCOUPLE_ERROR_MESSAGES["thermocouple-above_limit"] + " " + str(raw_temp))
+                base_msg = self.shared_state.error_messages.get("thermocouple-above_limit", "Above limit") if self.shared_state else "Above limit"
+                error_msg = base_msg + " " + str(raw_temp)
+                if self.shared_state:
+                    self.shared_state.set_error("thermocouple-above_limit", error_msg)
+                return None
 
             self.raw_temp = raw_temp
         except Exception as e:
             #print(f"Error reading temperature: {e}")
-            raise e
+            if self.shared_state:
+                base_msg = self.shared_state.error_messages.get("thermocouple-read_error", "Read error")
+                self.shared_state.set_error("thermocouple-read_error", f"{base_msg}: {str(e)}")
+            return None
         return raw_temp
 
 

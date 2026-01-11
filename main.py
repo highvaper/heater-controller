@@ -13,7 +13,6 @@ import uasyncio as asyncio
 
 from simple_pid import PID
 
-from errormessage import ErrorMessage
 from customtimer import CustomTimer
 from thermocouple import Thermocouple
 from displaymanager import DisplayManager
@@ -92,19 +91,20 @@ hardware_pin_heater = 22
 def timerSetPiTemp(t):
     global pi_temperature_sensor, pidTimer, display_manager, heater, shared_state
    
-    shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager)
+    shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager,shared_state)
     
     # Check if the temperature is safe
     if shared_state.pi_temperature > shared_state.pi_temperature_limit:
         try:
             if not pidTimer.is_timer_running: pidTimer.stop() 
             heater.off()
+            error_text = shared_state.error_messages.get("pi-too_hot", "PI too hot")
+            shared_state.set_error("pi-too_hot", error_text)
             while not shared_state.pi_temperature <= shared_state.pi_temperature_limit:
-                display_manager.display_error("pi-too_hot", 5) # Move display out of here?
-                
-                shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager)
+                shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager,shared_state)
                 utime.sleep_ms(250)  # Warning shown for 5 secs so has had a time to cool down a bit
-
+            
+            shared_state.clear_error()
             pidTimer.start()
         except Exception as e:
             heater.off()
@@ -121,7 +121,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     if shared_state.pid.setpoint != shared_state.temperature_setpoint:
         shared_state.pid.setpoint = shared_state.temperature_setpoint
     
-    new_heater_temperature, need_heater_off_temperature = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager)
+    new_heater_temperature, need_heater_off_temperature = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
 
     if new_heater_temperature < 0: # Non fatal error occured 
         heater.off() #should already be off
@@ -146,7 +146,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         heater.off()
         print("Getting safe off heater temperature")
         utime.sleep_ms(301) # lets give everything a moment to calm down
-        new_heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager)
+        new_heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
         if new_heater_temperature < 0: # Non fatal error occured 
             return   # Let timer run this again and hopefully next time error has passed
         # new off temperature is valid
@@ -210,28 +210,41 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         if (shared_state.input_volts / shared_state.lipo_count) < shared_state.lipo_safe_volts:
             heater.off()
             shared_state.set_mode("Off")
-            display_manager.display_error("battery_level-too-low",10,True)
+            error_text = shared_state.error_messages.get("battery_level-too-low", "Battery too low")
+            shared_state.set_error("battery_level-too-low", error_text)
+        else:
+            # Voltage is safe, clear error
+            shared_state.clear_error()
     elif shared_state.power_type == 'lead':
         if shared_state.input_volts  < shared_state.lead_safe_volts:
             heater.off()
             shared_state.set_mode("Off")
-            display_manager.display_error("battery_level-too-low",10,True)
+            error_text = shared_state.error_messages.get("battery_level-too-low", "Battery too low")
+            shared_state.set_error("battery_level-too-low", error_text)
+        else:
+            # Voltage is safe, clear error
+            shared_state.clear_error()
     elif shared_state.power_type == 'mains':
         if shared_state.input_volts > shared_state.mains_safe_volts:
             heater.off()
             shared_state.set_mode("Off")
-            display_manager.display_error("mains-voltage-too-high",10,True)
+            error_text = shared_state.error_messages.get("mains-voltage-too-high", "Mains voltage too high")
+            shared_state.set_error("mains-voltage-too-high", error_text)
+        else:
+            # Voltage is safe, clear error
+            shared_state.clear_error()
     else:
         heater.off()
         shared_state.set_mode("Off")
-        display_manager.display_error("unknown-power-type",10,True)    
+        error_text = shared_state.error_messages.get("unknown-power-type", "Unknown power type")
+        shared_state.set_error("unknown-power-type", error_text)    
    
         
     if power > shared_state.power_threshold:
         # Temperature over-limit protection with hysteresis
-        if shared_state.heater_temperature > 245:
+        if shared_state.heater_temperature > 250:
             shared_state.heater_too_hot = True
-        elif shared_state.heater_temperature < 230:  # Hysteresis threshold
+        elif shared_state.heater_temperature < 240:  # Hysteresis threshold
             shared_state.heater_too_hot = False
         
         if shared_state.heater_too_hot:
@@ -240,13 +253,12 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
             heater.off()
             error_text = "Pausing heater - " + shared_state.error_messages["heater-too_hot"] + " " + str(shared_state.heater_temperature)
             print(error_text)
-            # Only display error once, not repeatedly every cycle
-            if not hasattr(shared_state, '_error_displayed') or not shared_state._error_displayed:
-                display_manager.display_error("heater-too_hot", 10, True)
-                shared_state._error_displayed = True
+            # Set error in shared_state to display on screen
+            if not shared_state.has_error():
+                shared_state.set_error("heater-too_hot", error_text)
         else:
             # Temperature is safe, clear error flag
-            shared_state._error_displayed = False
+            shared_state.clear_error()
             # Only turn heater back on if we were trying to heat
             if not heater.is_on():
                 if shared_state.get_mode() != "Off":
@@ -414,7 +426,7 @@ del button_pin
 # Initialize termocouple before switching on induction heater
 try:
     utime.sleep_ms(700)
-    thermocouple = Thermocouple(hardware_pin_termocouple_sck, hardware_pin_termocouple_cs, hardware_pin_termocouple_so, shared_state.heater_on_temperature_difference_threshold)
+    thermocouple = Thermocouple(hardware_pin_termocouple_sck, hardware_pin_termocouple_cs, hardware_pin_termocouple_so, shared_state.heater_on_temperature_difference_threshold, shared_state)
     utime.sleep_ms(350)
     _, _ = thermocouple.get_filtered_temp(False)  # Sets: last_known_safe_temp - Do here rather than in class as it sometimes returns error if on class init 
 except Exception as e:
@@ -440,7 +452,7 @@ except Exception as e:
 
 # PI Temperature Sensor 
 pi_temperature_sensor = machine.ADC(4)
-shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager)
+shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager, shared_state)
 
 
 # InputHandler
@@ -481,7 +493,7 @@ heater.off()
 
 
 pidTimer = CustomTimer(371, machine.Timer.PERIODIC, timerUpdatePIDandHeater)  # need to have timer setup before calling below 
-shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager)
+shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
 
 
 print("Timers Initialising ...")
@@ -551,14 +563,17 @@ async def async_main():
         pass
 
     while True:
-        if not shared_state.in_menu:
+        # Check and display any active errors
+        if shared_state.has_error():
+            display_manager.show_error()
+        elif not shared_state.in_menu:
             if shared_state.current_menu_position <= 1:
                 # ensure rotary values set once
                 if shared_state.rotary_last_mode != "setpoint":
                     input_handler.setup_rotary_values()
                 shared_state.current_menu_position = 1
                 # start async home-screen updater (no-op if already running)
-                display_manager.start_home(lambda: shared_state.pid.components, heater, loop=asyncio.get_event_loop() if asyncio else None, interval_ms=200)
+                display_manager.start_home(heater, loop=asyncio.get_event_loop() if asyncio else None, interval_ms=200)
             else:
                 # leaving home/menu selection - stop async home updates
                 display_manager.stop_home()
