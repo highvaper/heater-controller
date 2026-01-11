@@ -213,25 +213,33 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         
     if power > shared_state.power_threshold:
         # Temperature over-limit protection with hysteresis
-        if shared_state.heater_temperature > 250:
+        if shared_state.heater_temperature > 245:
             shared_state.heater_too_hot = True
-        elif shared_state.heater_temperature < 240:  # Hysteresis threshold
+        elif shared_state.heater_temperature < 230:  # Hysteresis threshold
             shared_state.heater_too_hot = False
         
         if shared_state.heater_too_hot:
-            if heater.is_on():
-                heater.off()
+            # Ensure heater is OFF before showing error
+            heater.set_power(0)
+            heater.off()
             error_text = "Pausing heater - " + shared_state.error_messages["heater-too_hot"] + " " + str(shared_state.heater_temperature)
             print(error_text)
-            display_manager.display_error("heater-too_hot",10,True)
-        elif not heater.is_on():
-            if shared_state.get_mode() != "Off":
-                heater.on(power)
-        if isinstance(heater, ElementHeater):
-            heater.set_power(power)
+            # Only display error once, not repeatedly every cycle
+            if not hasattr(shared_state, '_error_displayed') or not shared_state._error_displayed:
+                display_manager.display_error("heater-too_hot", 10, True)
+                shared_state._error_displayed = True
+        else:
+            # Temperature is safe, clear error flag
+            shared_state._error_displayed = False
+            # Only turn heater back on if we were trying to heat
+            if not heater.is_on():
+                if shared_state.get_mode() != "Off":
+                    heater.on(power)
+            # Set power only when temperature is safe
+            if isinstance(heater, ElementHeater):
+                heater.set_power(power)
     else:
-        if heater.is_on():
-            heater.off()  #Maybe we call this no matter what just in case?
+        heater.off()  #Maybe we call this no matter what just in case?
     
  #   t = ','.join(map(str, [pid._last_time, shared_state.heater_temperature, thermocouple.raw_temp, pid.setpoint, power, heater.is_on(), pid.components]))
  #   print(t)
