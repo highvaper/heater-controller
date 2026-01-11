@@ -526,8 +526,7 @@ class DisplayManager:
     def show_screen_show_settings(self):
         self.display.fill(0)
         
-        exclude_vars = {'temperature_readings','input_volts_readings','watt_readings','menu_options','error_messages'}  
-        vars_dict = {k: v for k, v in self.shared_state.__dict__.items() if k not in exclude_vars}        
+        vars_dict = dict(self.shared_state.__dict__.items())        
         vars_dict = dict(vars_dict.items())
         
         items_list = list(vars_dict.items())
