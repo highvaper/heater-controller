@@ -180,10 +180,8 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     if shared_state.control == 'temperature_pid': 
         power = shared_state.pid(shared_state.heater_temperature)  # Update pid even if heater is off
     elif shared_state.control == 'duty_cycle':
-        shared_state.pid.reset()
         power = shared_state.set_duty_cycle  # Use duty cycle directly (0-100%)
     else:
-        shared_state.pid.reset()  #better to move to where control state changes in inputhandler but pid is not in shared state so need to move there too
         # In watts mode, calculate duty cycle needed to produce desired watts at current voltage
         # watts = (V^2 / R) * (duty% / 100)
         # duty% = (watts * R / V^2) * 100

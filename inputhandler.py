@@ -220,14 +220,17 @@ class InputHandler:
         if self.switch_control_button_pressed:
             if self.shared_state.control == 'temperature_pid': 
                 self.shared_state.control = 'watts'
+                self.shared_state.pid.reset()
                 self.rotary.set(value=self.shared_state.setwatts)
                 self.previous_rotary_value = self.shared_state.setwatts
             elif self.shared_state.control == 'watts':
                 self.shared_state.control = 'duty_cycle'
+                self.shared_state.pid.reset()
                 self.rotary.set(value=self.shared_state.set_duty_cycle)
                 self.previous_rotary_value = self.shared_state.set_duty_cycle
             else:
                 self.shared_state.control = 'temperature_pid'
+                self.shared_state.pid.reset()
                 self.rotary.set(value=self.shared_state.temperature_setpoint)
                 self.previous_rotary_value = self.shared_state.temperature_setpoint
             # Force rotary_last_mode to None so setup_rotary_values will update the limits
