@@ -116,7 +116,7 @@ def timerSetPiTemp(t):
 
 def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termocouple function 
                                  #this needs a major clear up now we have share_state 
-    global heater, thermocouple
+    global heater, thermocouple, pidTimer, display_manager, shared_state
 
     if shared_state.pid.setpoint != shared_state.temperature_setpoint:
         shared_state.pid.setpoint = shared_state.temperature_setpoint
