@@ -19,7 +19,7 @@ temperature_max_allowed_setpoint=250
 control=temperature_pid
 
 # Fixed wattage level when control='watts': int (watts)
-setwatts=30
+set_watts=30
 
 # Duty cycle percentage when control='duty_cycle': int (0-100%)
 set_duty_cycle=10

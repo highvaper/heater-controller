@@ -196,7 +196,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         # watts = (V^2 / R) * (duty% / 100)
         # duty% = (watts * R / V^2) * 100
         if shared_state.input_volts > 0:
-            power = (shared_state.setwatts * shared_state.heater_resistance / (shared_state.input_volts * shared_state.input_volts)) * 100
+            power = (shared_state.set_watts * shared_state.heater_resistance / (shared_state.input_volts * shared_state.input_volts)) * 100
         else:
             power = 0
 

@@ -27,7 +27,7 @@ def load_profile(profile_name, shared_state):
                             # Handle new key names (map to old attribute names for compatibility)
                             if key in ['session_timeout', 'session_extend_time', 'temperature_setpoint', 'power_threshold',
                                       'heater_on_temperature_difference_threshold', 'max_watts', 'click_check_timeout',
-                                      'temperature_max_allowed_setpoint', 'setwatts', 'set_duty_cycle', 'lipo_count', 'pi_temperature_limit']:
+                                      'temperature_max_allowed_setpoint', 'set_watts', 'set_duty_cycle', 'lipo_count', 'pi_temperature_limit']:
                                 config[key] = int(value)
                                 if key == 'session_timeout':
                                     config[key] = int(value) * 1000  # Convert to milliseconds

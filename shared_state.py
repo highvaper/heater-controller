@@ -19,7 +19,7 @@ class SharedState:
         self.control = 'temperature_pid'
         #self.control = 'watts'
         #self.control = 'duty_cycle'
-        self.setwatts = 30  # like setpoint but for watts
+        self.set_watts = 30  # like setpoint but for watts
         self.set_duty_cycle = 50  # Duty cycle percentage (0-100%) when control='duty_cycle'
         
         
@@ -239,8 +239,8 @@ class SharedState:
             self.pid.setpoint = self.temperature_setpoint  # Update PID setpoint too
         if 'control' in profile_config:
             self.control = profile_config['control']
-        if 'setwatts' in profile_config:
-            self.setwatts = profile_config['setwatts']
+        if 'set_watts' in profile_config:
+            self.set_watts = profile_config['set_watts']
         if 'set_duty_cycle' in profile_config:
             self.set_duty_cycle = profile_config['set_duty_cycle']
         if 'power_type' in profile_config:
@@ -295,7 +295,7 @@ class SharedState:
             'temperature_units': 'C',
             'temperature_setpoint': 165,
             'control': 'temperature_pid',
-            'setwatts': 30,
+            'set_watts': 30,
             'set_duty_cycle': 50,
             'power_type': 'mains',
             'lipo_count': 4,

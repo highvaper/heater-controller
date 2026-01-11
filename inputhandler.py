@@ -74,8 +74,8 @@ class InputHandler:
             #need to update to temperature-setpoint and for when we have watts-pid control
             if self.shared_state.rotary_last_mode != "setpoint":
                 if self.shared_state.control == 'watts':
-                    self.rotary.set(value=self.shared_state.setwatts)
-                    self.previous_rotary_value = self.shared_state.setwatts
+                    self.rotary.set(value=self.shared_state.set_watts)
+                    self.previous_rotary_value = self.shared_state.set_watts
                     self.rotary.set(min_val=0)
                     self.rotary.set(max_val=self.shared_state.max_watts)
                 elif self.shared_state.control == 'duty_cycle':
@@ -120,7 +120,7 @@ class InputHandler:
                     self.rotary.set(value=(self.rotary.value() - adjustment_rate))
                 
                 if self.shared_state.control == 'watts':
-                    self.shared_state.setwatts = self.rotary.value()
+                    self.shared_state.set_watts = self.rotary.value()
                 elif self.shared_state.control == 'duty_cycle':
                     self.shared_state.set_duty_cycle = self.rotary.value()
                 else:
@@ -225,8 +225,8 @@ class InputHandler:
             if self.shared_state.control == 'temperature_pid': 
                 self.shared_state.control = 'watts'
                 self.shared_state.pid.reset()
-                self.rotary.set(value=self.shared_state.setwatts)
-                self.previous_rotary_value = self.shared_state.setwatts
+                self.rotary.set(value=self.shared_state.set_watts)
+                self.previous_rotary_value = self.shared_state.set_watts
             elif self.shared_state.control == 'watts':
                 self.shared_state.control = 'duty_cycle'
                 self.shared_state.pid.reset()

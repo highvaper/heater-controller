@@ -440,7 +440,7 @@ class DisplayManager:
         shared_state = self.shared_state
 
         if self.shared_state.control == 'watts':
-            t = "P: " + str(shared_state.watts) + "W (" + str(int(shared_state.setwatts)) + "W)"
+            t = "P: " + str(shared_state.watts) + "W (" + str(int(shared_state.set_watts)) + "W)"
             self.display.text(t, 0, 0)
             t = "V: " + "{:.1f}".format(shared_state.input_volts) + "V"
             if shared_state.temperature_units == 'F':
