@@ -169,7 +169,9 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         del shared_state.watt_readings[oldest_time]
     
     if heater.is_on():
-        shared_state.watts = int((((shared_state.input_volts*shared_state.input_volts) / shared_state.heater_resistance) * (shared_state.heater_max_duty_cycle_percent/100))  * (heater.get_power() / 100))
+        # Calculate actual watts from voltage, resistance, and actual duty cycle
+        # Don't use heater_max_duty_cycle_percent as that's a safety limit, not the actual power
+        shared_state.watts = int((((shared_state.input_volts*shared_state.input_volts) / shared_state.heater_resistance) * (heater.get_power() / 100)))
         shared_state.watt_readings[utime.ticks_ms()] = shared_state.watts
     else:
         shared_state.watts = 0
@@ -182,7 +184,13 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         power = shared_state.set_duty_cycle  # Use duty cycle directly (0-100%)
     else:
         shared_state.pid.reset()  #better to move to where control state changes in inputhandler but pid is not in shared state so need to move there too
-        power = (shared_state.setwatts/shared_state.max_watts) * 100
+        # In watts mode, calculate duty cycle needed to produce desired watts at current voltage
+        # watts = (V^2 / R) * (duty% / 100)
+        # duty% = (watts * R / V^2) * 100
+        if shared_state.input_volts > 0:
+            power = (shared_state.setwatts * shared_state.heater_resistance / (shared_state.input_volts * shared_state.input_volts)) * 100
+        else:
+            power = 0
 
     power = min(power , 100)  #Limit happening in heater set power but lets limit here too
     
