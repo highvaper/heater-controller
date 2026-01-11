@@ -32,7 +32,9 @@ class SharedState:
         self.lead_safe_volts = 12.0 
         self.mains_safe_volts = 28.0 
 
-        self.heater_resitance = 0.49  #this should not change unless coils is replaced user needs to provide this value
+        self.heater_resistance = 0.49  #this should not change unless coils is replaced user needs to provide this value
+
+        self.heater_too_hot = False  # State variable for temperature over-limit hysteresis (250C turn on, 240C turn off)
 
         self.max_watts = 75 #135w for 0.6 ohm nichrome coil is about max before it starts to glow
                              #Note: 14 awg copper wire rated max amp is about 15amp - so at 12v = 180w max power to be safe
@@ -191,13 +193,15 @@ class SharedState:
             self.session_reset_pid_when_near_setpoint = profile_config['session_reset_pid_when_near_setpoint']
         if 'temperature_units' in profile_config:
             self.temperature_units = profile_config['temperature_units']
-        if 'temperature-setpoint' in profile_config:
-            self.temperature_setpoint = profile_config['temperature-setpoint']
+        if 'temperature_setpoint' in profile_config:
+            self.temperature_setpoint = profile_config['temperature_setpoint']
             self.pid.setpoint = self.temperature_setpoint  # Update PID setpoint too
         if 'control' in profile_config:
             self.control = profile_config['control']
         if 'setwatts' in profile_config:
             self.setwatts = profile_config['setwatts']
+        if 'set_duty_cycle' in profile_config:
+            self.set_duty_cycle = profile_config['set_duty_cycle']
         if 'power_type' in profile_config:
             self.power_type = profile_config['power_type']
         if 'lipo_count' in profile_config:
@@ -214,16 +218,16 @@ class SharedState:
             self.heater_on_temperature_difference_threshold = profile_config['heater_on_temperature_difference_threshold']
         if 'max_watts' in profile_config:
             self.max_watts = profile_config['max_watts']
-        if 'heater_resitance' in profile_config:
-            self.heater_resitance = profile_config['heater_resitance']
+        if 'heater_resistance' in profile_config:
+            self.heater_resistance = profile_config['heater_resistance']
         if 'display_contrast' in profile_config:
             self.display_contrast = profile_config['display_contrast']
         if 'display_rotate' in profile_config:
             self.display_rotate = profile_config['display_rotate']
         if 'click_check_timeout' in profile_config:
             self.click_check_timeout = profile_config['click_check_timeout']
-        if 'max_allowed_setpoint' in profile_config:
-            self.max_allowed_setpoint = profile_config['max_allowed_setpoint']
+        if 'temperature_max_allowed_setpoint' in profile_config:
+            self.temperature_max_allowed_setpoint = profile_config['temperature_max_allowed_setpoint']
         if 'pi_temperature_limit' in profile_config:
             self.pi_temperature_limit = profile_config['pi_temperature_limit']
         if 'pid_tunings' in profile_config:
@@ -260,7 +264,7 @@ class SharedState:
             'power_threshold': 0,
             'heater_on_temperature_difference_threshold': 20,
             'max_watts': 75,
-            'heater_resitance': 0.49,
+            'heater_resistance': 0.49,
             'display_contrast': 255,
             'display_rotate': True,
             'click_check_timeout': 800,

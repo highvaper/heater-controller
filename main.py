@@ -134,7 +134,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
 
     #shared_state.heater_max_duty_cycle_percent - need to update this now and adjust to MAX WATTS (add to shared state)
     if shared_state.input_volts > 0:
-        shared_state.heater_max_duty_cycle_percent = (shared_state.max_watts / (shared_state.input_volts * shared_state.input_volts / shared_state.heater_resitance)) * 100  
+        shared_state.heater_max_duty_cycle_percent = (shared_state.max_watts / (shared_state.input_volts * shared_state.input_volts / shared_state.heater_resistance)) * 100  
     else:
         shared_state.heater_max_duty_cycle_percent = 100
         
@@ -169,7 +169,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         del shared_state.watt_readings[oldest_time]
     
     if heater.is_on():
-        shared_state.watts = int((((shared_state.input_volts*shared_state.input_volts) / shared_state.heater_resitance) * (shared_state.heater_max_duty_cycle_percent/100))  * (heater.get_power() / 100))
+        shared_state.watts = int((((shared_state.input_volts*shared_state.input_volts) / shared_state.heater_resistance) * (shared_state.heater_max_duty_cycle_percent/100))  * (heater.get_power() / 100))
         shared_state.watt_readings[utime.ticks_ms()] = shared_state.watts
     else:
         shared_state.watts = 0
@@ -212,10 +212,13 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
    
         
     if power > shared_state.power_threshold:
-        # Hard coded this limit if user wants to go higher then they need to edit code - 
-        # Getting past PTFE safe limits so if using that as thermocouple/element protection 
-        # be careful not to burn through and short out the max6675 from the element
-        if abs(shared_state.heater_temperature) > 250:  
+        # Temperature over-limit protection with hysteresis
+        if shared_state.heater_temperature > 250:
+            shared_state.heater_too_hot = True
+        elif shared_state.heater_temperature < 240:  # Hysteresis threshold
+            shared_state.heater_too_hot = False
+        
+        if shared_state.heater_too_hot:
             if heater.is_on():
                 heater.off()
             error_text = "Pausing heater - " + shared_state.error_messages["heater-too_hot"] + " " + str(shared_state.heater_temperature)
@@ -581,18 +584,19 @@ async def async_main():
                 led_blue_pin.on()
             else:
                 led_blue_pin.off()
-            #Need to update below when we do watts_pid control
-            if shared_state.session_setpoint_reached == False:
-                if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
-                    shared_state.session_setpoint_reached = True
-                    buzzer_play_tone(buzzer, 1500, 350)
-                    if shared_state.session_reset_pid_when_near_setpoint:
+            # Only check setpoint reached in temperature-PID mode
+            if shared_state.control == 'temperature_pid':
+                if shared_state.session_setpoint_reached == False:
+                    if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
+                        shared_state.session_setpoint_reached = True
+                        buzzer_play_tone(buzzer, 1500, 350)
+                        if shared_state.session_reset_pid_when_near_setpoint:
+                            shared_state.pid.reset()
+                else:
+                    #Need to make '15' in shared state so can be set via profile
+                    #need to catch runaway temp here after we have already reached setpointand reset pid stats 
+                    if shared_state.heater_temperature > (shared_state.temperature_setpoint + 15):
                         shared_state.pid.reset()
-            else:
-                #Need to make '15' in shared state so can be set via profile
-                #need to catch runaway temp here after we have already reached setpointand reset pid stats 
-                if shared_state.heater_temperature > (shared_state.temperature_setpoint + 15):
-                    shared_state.pid.reset()
 
         if enable_watchdog:
             try:

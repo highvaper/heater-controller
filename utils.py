@@ -60,7 +60,7 @@ def load_profile(profile_name, shared_state):
                                         config[key] = int(value)
                                     else:
                                         print(f"Warning: set_duty_cycle out of range (0-100): {value}")
-                            elif key in ['heater_resitance', 'lipo_safe_volts', 'lead_safe_volts', 'mains_safe_volts']:
+                            elif key in ['heater_resistance', 'lipo_safe_volts', 'lead_safe_volts', 'mains_safe_volts']:
                                 config[key] = float(value)
                             elif key in ['display_contrast']:
                                 if 0 <= int(value) <= 255:
