@@ -164,6 +164,10 @@ class SharedState:
                        "thermocouple-above_limit": "Temperature above limit"
         }
 
+        # Controls that are currently enabled/available on this hardware
+        # Possible values: 'temperature_pid', 'duty_cycle', 'watts'
+        self.enabled_controls = ['temperature_pid', 'duty_cycle', 'watts']
+
 
     def get_mode(self):
         if self._mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
@@ -277,8 +281,38 @@ class SharedState:
             self.pid.tunings = self.pid_tunings  # Update PID tunings immediately
         if 'pid_reset_high_temperature' in profile_config:
             self.pid_reset_high_temperature = profile_config['pid_reset_high_temperature']
+
+        # If the profile requested a control mode, ensure it's enabled
+        if 'control' in profile_config:
+            desired = profile_config['control']
+            if self.is_control_enabled(desired):
+                self.control = desired
+            else:
+                enabled = self.get_enabled_controls()
+                if enabled:
+                    self.control = enabled[0]
+                else:
+                    self.control = 'duty_cycle'
         
         print(f"Profile applied to SharedState")
+
+    # Control enable/disable helpers
+    def enable_control(self, control_name):
+        if control_name not in self.enabled_controls:
+            self.enabled_controls.append(control_name)
+
+    def disable_control(self, control_name):
+        if control_name in self.enabled_controls:
+            try:
+                self.enabled_controls.remove(control_name)
+            except ValueError:
+                pass
+
+    def is_control_enabled(self, control_name):
+        return control_name in self.enabled_controls
+
+    def get_enabled_controls(self):
+        return list(self.enabled_controls)
     
     def set_profile_name(self, profile_name):
         """Update the profile name and refresh menu_options display."""

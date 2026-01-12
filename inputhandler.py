@@ -222,19 +222,28 @@ class InputHandler:
                 self.switch_control_button_pressed = False
                 
         if self.switch_control_button_pressed:
-            if self.shared_state.control == 'temperature_pid': 
-                self.shared_state.control = 'watts'
-                self.shared_state.pid.reset()
+            enabled = self.shared_state.get_enabled_controls()
+            if not enabled:
+                # Fallback to duty_cycle if nothing enabled
+                new_control = 'duty_cycle'
+            else:
+                try:
+                    idx = enabled.index(self.shared_state.control)
+                    new_control = enabled[(idx + 1) % len(enabled)]
+                except ValueError:
+                    # Current control not in enabled list, pick first
+                    new_control = enabled[0]
+
+            # Set new control and update rotary to appropriate value
+            self.shared_state.control = new_control
+            self.shared_state.pid.reset()
+            if new_control == 'watts':
                 self.rotary.set(value=self.shared_state.set_watts)
                 self.previous_rotary_value = self.shared_state.set_watts
-            elif self.shared_state.control == 'watts':
-                self.shared_state.control = 'duty_cycle'
-                self.shared_state.pid.reset()
+            elif new_control == 'duty_cycle':
                 self.rotary.set(value=self.shared_state.set_duty_cycle)
                 self.previous_rotary_value = self.shared_state.set_duty_cycle
-            else:
-                self.shared_state.control = 'temperature_pid'
-                self.shared_state.pid.reset()
+            else:  # temperature_pid
                 self.rotary.set(value=self.shared_state.temperature_setpoint)
                 self.previous_rotary_value = self.shared_state.temperature_setpoint
             # Force rotary_last_mode to None so setup_rotary_values will update the limits

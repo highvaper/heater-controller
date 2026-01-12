@@ -164,7 +164,10 @@ def get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer,
         if isinstance(heater, InductionHeater):
             new_temperature, need_off_temperature = thermocouple.get_filtered_temp(heater.is_on())
         elif isinstance(heater, ElementHeater):
-            new_temperature = thermocouple.read_raw_temp()
+            if thermocouple is not None:
+                new_temperature = thermocouple.read_raw_temp()
+            else:  
+                new_temperature = 0
             need_off_temperature = False  # caller can throw this away if not needed
             
             # Check if an error was set during read

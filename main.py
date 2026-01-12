@@ -120,8 +120,12 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
 
     if shared_state.pid.setpoint != shared_state.temperature_setpoint:
         shared_state.pid.setpoint = shared_state.temperature_setpoint
-    
-    new_heater_temperature, need_heater_off_temperature = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
+
+    if thermocouple is not None:
+        new_heater_temperature, need_heater_off_temperature = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
+    else:
+        new_heater_temperature = 0
+        need_heater_off_temperature = False
 
     if new_heater_temperature < 0: # Non fatal error occured 
         heater.off() #should already be off
@@ -423,31 +427,35 @@ del button_pin
 #Termocouple K type
 #MAX6675
 
-# Initialize termocouple before switching on induction heater
+# Initialize termocouple before switching on heater
 try:
-    utime.sleep_ms(700)
+    utime.sleep_ms(100)
     thermocouple = Thermocouple(hardware_pin_termocouple_sck, hardware_pin_termocouple_cs, hardware_pin_termocouple_so, shared_state.heater_on_temperature_difference_threshold, shared_state)
     utime.sleep_ms(350)
-    _, _ = thermocouple.get_filtered_temp(False)  # Sets: last_known_safe_temp - Do here rather than in class as it sometimes returns error if on class init 
 except Exception as e:
-    error_text = "Start up failed: " + str(e)
+    error_text = "Thermocouple init failed: " + str(e)
     print(error_text)
-    while True:
-        try:
-            # Use blocking draw so message appears before asyncio loop starts
-            display_manager.fill_display("thermocouple-setup", 0, 12)
-        except Exception:
-            try:
-                # Fallback to raw display if DisplayManager isn't available
-                display.fill(0)
-                display.text("thermocouple-setup", 0, 12, 1)
-                display.show()
-            except Exception:
-                pass
-        utime.sleep_ms(500)
-    sys.exit() #?
+    try:
+        shared_state.set_error("thermocouple-not-available", error_text)
+    except Exception:
+        pass
+    shared_state.disable_control('temperature_pid')
+    display_manager.fill_display("thermocouple-setup", 0, 12)
+    thermocouple = None
 
+if thermocouple is not None:
+    _, _ = thermocouple.get_filtered_temp(False)  # Sets: last_known_safe_temp - Do here rather than in class as it sometimes returns error if on class init 
 
+if shared_state.has_error():
+    err = shared_state.current_error[0]
+    if isinstance(err, str) and err.startswith('thermocouple') or err == 'thermocouple-not-available':
+        # Give the user a moment to see the message, then clear it so the home screen appears
+        utime.sleep_ms(1000)
+        shared_state.clear_error()
+
+        # Thermocouple not available — switch to duty_cycle control so temperature-pid can't be selected
+        shared_state.control = 'duty_cycle'
+        shared_state.rotary_last_mode = None
 
 
 # PI Temperature Sensor 

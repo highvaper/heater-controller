@@ -18,14 +18,22 @@ class Thermocouple:
         self.filtered_temp_counter = 0
         try:
             self.thermocouple_sensor = MAX6675(self.sck, self.cs, self.so)
-            #utime.sleep_ms(350)
             #self.update_filtered_temp(False) # Initialize last_known_safe_temp
-            print("Thermocouple initialised.")
+            try:
+                self.read_raw_temp()
+            except Exception as e:
+                print("Error reading raw temperature during initialization:", e)
+            if(self.read_raw_temp() > 0):  #do a read to tigger error if there is one
+                print("Thermocouple initialised.")
+            else:
+                raise Exception("Thermocouple read error during initialisation.")
         except Exception as e:
-            error_msg = self.shared_state.error_messages.get("thermocouple-setup", "Thermocouple setup error") if self.shared_state else "Thermocouple setup error"
-            error_text = error_msg + ": " + str(e)
-            if self.shared_state:
-                self.shared_state.set_error("thermocouple-setup", error_text)
+            print("Thermocouple initialisation failed.")
+
+#            error_msg = self.shared_state.error_messages.get("thermocouple-setup", "Thermocouple setup error") if self.shared_state else "Thermocouple setup error"
+#            error_text = error_msg + ": " + str(e)
+ #           if self.shared_state:
+ #               self.shared_state.set_error("thermocouple-setup", error_text)
             # Optionally, handle the error further or re-raise it
             raise
 
