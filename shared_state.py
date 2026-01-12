@@ -337,9 +337,9 @@ class SharedState:
             'session_extend_time': 2 * 60 * 1000,
             'session_reset_pid_when_near_setpoint': True,
             'temperature_units': 'C',
-            'temperature_setpoint': 165,
+            'temperature_setpoint': 160,
             'control': 'temperature_pid',
-            'set_watts': 30,
+            'set_watts': 20,
             'set_duty_cycle': 50.0,
             'power_type': 'mains',
             'lipo_count': 4,
@@ -348,8 +348,8 @@ class SharedState:
             'mains_safe_volts': 28.0,
             'power_threshold': 0,
             'heater_on_temperature_difference_threshold': 20,
-            'max_watts': 75,
-            'heater_resistance': 0.49,
+            'max_watts': 25, #Set this low for startup
+            'heater_resistance': 0.35,  #Set this low so that max_duty_cycle is not too high at startup
             'display_contrast': 255,
             'display_rotate': True,
             'click_check_timeout': 800,
