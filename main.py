@@ -26,22 +26,7 @@ from utils import initialize_display, get_input_volts, buzzer_play_tone, get_the
 
 from shared_state import SharedState
 
-#pid_tunings = 0.48, 0.004, 0   #18mm + nichrome 2mm
-#pid_tunings = 0.29, 0.0008, 0   #18mm + nichrome 3mm - 60% limit
-#pid_tunings = 0.33, 0.0011, 0   #20mm + nichrome 3mm - 70% limit
 
-#pid_tunings = 0.27, 0.00065, 0   #new heater + 6 coil + nichrome 4mm approx 0.7 ohms - 40% pwm limit - 73 watts meeasured 
-
-
-
-#pid_tunings = 0.27, 0.00065, 0   #new heater + 6 coil + nichrome 4mm approx 0.7 ohms - 30% pwm limit - 57 watts meeasured 
-#pid_tunings = 0.28, 0.0008, 0   #new heater + 6 coil + nichrome 4mm approx 0.7 ohms - 25% pwm limit - 47 watts meeasured 
-
-
-#pid_tunings = 2.3, 0.03, 0   #new heater + 6 coil + nichrome 4mm approx 0.6 ohms - with 2 x lipo batteries
-
-
-#add option for PWM mode so dial sets duty %  and ignore pid/temp (up to 300?) and just go in manual mode - show watts as we can work it out
 
 #Need to get input voltage measured so we can possibly set an upper limit 
 #eg:

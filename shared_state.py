@@ -48,7 +48,7 @@ class SharedState:
         self.pi_temperature_limit = 60  # Shutdown if PI exceeds this temperature
         
         # PID Tuning - can be loaded from profile
-        self.pid_tunings = (2.3, 0.03, 0)  # (P, I, D) - example for 2x lipo batteries
+        self.pid_temperature_tunings = (2.3, 0.03, 0)  # (P, I, D) - example for 2x lipo batteries
         
         # Track which profile is currently loaded
         self.profile = "default"  # Will be updated when a profile is loaded
@@ -268,6 +268,9 @@ class SharedState:
             self.heater_on_temperature_difference_threshold = profile_config['heater_on_temperature_difference_threshold']
         if 'max_watts' in profile_config:
             self.max_watts = profile_config['max_watts']
+            # Reset temp_max_watts if profile's max_watts is less than current temp_max_watts
+            if self.max_watts < self.temp_max_watts:
+                self.temp_max_watts = self.max_watts
         if 'heater_resistance' in profile_config:
             self.heater_resistance = profile_config['heater_resistance']
         if 'display_contrast' in profile_config:
@@ -280,9 +283,9 @@ class SharedState:
             self.temperature_max_allowed_setpoint = profile_config['temperature_max_allowed_setpoint']
         if 'pi_temperature_limit' in profile_config:
             self.pi_temperature_limit = profile_config['pi_temperature_limit']
-        if 'pid_tunings' in profile_config:
-            self.pid_tunings = profile_config['pid_tunings']
-            self.pid.tunings = self.pid_tunings  # Update PID tunings immediately
+        if 'pid_temperature_tunings' in profile_config:
+            self.pid_temperature_tunings = profile_config['pid_temperature_tunings']
+            self.pid.tunings = self.pid_temperature_tunings  # Update PID tunings immediately
         if 'pid_reset_high_temperature' in profile_config:
             self.pid_reset_high_temperature = profile_config['pid_reset_high_temperature']
 
@@ -352,6 +355,6 @@ class SharedState:
             'click_check_timeout': 800,
             'temperature_max_allowed_setpoint': 250,
             'pi_temperature_limit': 60,
-            'pid_tunings': (2.3, 0.03, 0),
+            'pid_temperature_tunings': (2.3, 0.03, 0),
             'pid_reset_high_temperature': 15,
         }

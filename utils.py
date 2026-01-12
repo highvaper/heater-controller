@@ -87,13 +87,13 @@ def load_profile(profile_name, shared_state):
                                     print(f"Warning: power_type must be 'mains', 'lipo', or 'lead': {value}")
                             elif key in ['display_rotate', 'session_reset_pid_when_near_setpoint']:
                                 config[key] = value.lower() in ['true', '1', 'yes']
-                            elif key == 'pid_tunings':
+                            elif key == 'pid_temperature_tunings':
                                 # Parse PID tunings as comma-separated float values: P,I,D
                                 tunings_str = value.split(',')
                                 if len(tunings_str) == 3:
                                     config[key] = (float(tunings_str[0].strip()), float(tunings_str[1].strip()), float(tunings_str[2].strip()))
                                 else:
-                                    print(f"Warning: pid_tunings must be in format 'P,I,D' (got: {value})")
+                                    print(f"Warning: pid_temperature_tunings must be in format 'P,I,D' (got: {value})")
                         except (ValueError, TypeError) as e:
                             print(f"Warning: Could not parse {key}={value}: {e}")
     except OSError as e:

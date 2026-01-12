@@ -86,7 +86,7 @@ pi_temperature_limit=60
 # ===== PID TUNING =====
 # PID tuning parameters: float,float,float (P,I,D values)
 # These control how the PID responds to temperature changes
-pid_tunings=2.3,0.03,0
+pid_temperature_tunings=2.3,0.03,0
 
 # Degrees above setpoint at which PID will be reset if temperature spikes after reaching setpoint
 pid_reset_high_temperature=15
