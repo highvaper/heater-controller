@@ -138,7 +138,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
 
     #shared_state.heater_max_duty_cycle_percent - need to update this now and adjust to MAX WATTS (add to shared state)
     if shared_state.input_volts > 0:
-        shared_state.heater_max_duty_cycle_percent = (shared_state.max_watts / (shared_state.input_volts * shared_state.input_volts / shared_state.heater_resistance)) * 100  
+        shared_state.heater_max_duty_cycle_percent = (shared_state.temp_max_watts / (shared_state.input_volts * shared_state.input_volts / shared_state.heater_resistance)) * 100  
     else:
         shared_state.heater_max_duty_cycle_percent = 100
         
