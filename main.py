@@ -464,7 +464,7 @@ shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_
 
 
 # InputHandler
-input_handler = InputHandler(rotary_clk_pin=hardware_pin_rotary_clk, rotary_dt_pin=hardware_pin_rotary_dt, button_pin=hardware_pin_button, switch_control_pin=hardware_pin_switch_left, shared_state=shared_state)
+input_handler = InputHandler(rotary_clk_pin=hardware_pin_rotary_clk, rotary_dt_pin=hardware_pin_rotary_dt, button_pin=hardware_pin_button, switch_control_pin=hardware_pin_switch_left, middle_button_pin=hardware_pin_switch_middle, shared_state=shared_state)
 
 # MenuSystem
 menu_system = MenuSystem(display_manager, shared_state)
@@ -574,10 +574,32 @@ async def async_main():
         # Check and display any active errors
         if shared_state.has_error():
             display_manager.show_error()
+        # Check if user clicked middle button to show temp_max_watts screen
+        elif shared_state.middle_button_pressed:
+            display_manager.stop_home()
+            shared_state.in_menu = False  # Make sure we exit menu mode
+            shared_state.temp_max_watts_screen_active = True
+            shared_state.temp_max_watts_start_time = utime.ticks_ms()
+            shared_state.rotary_last_mode = None  # Reset so setup_rotary_values sets it to "Temp Max Watts"
+            input_handler.setup_rotary_values()
+            display_manager.show_screen_temp_max_watts()
+            shared_state.middle_button_pressed = False
+        # Handle temp_max_watts screen display with timeout
+        elif shared_state.temp_max_watts_screen_active:
+            # Check if timeout has elapsed (2 seconds with no rotary activity)
+            elapsed = utime.ticks_diff(utime.ticks_ms(), shared_state.temp_max_watts_start_time)
+            if elapsed >= 2000:
+                # Timeout - return to home screen
+                shared_state.temp_max_watts_screen_active = False
+                shared_state.rotary_last_mode = None
+                shared_state.current_menu_position = 1
+            else:
+                # Still displaying - update the screen
+                display_manager.show_screen_temp_max_watts()
         elif not shared_state.in_menu:
             if shared_state.current_menu_position <= 1:
-                # ensure rotary values set once
-                if shared_state.rotary_last_mode != "setpoint":
+                # ensure rotary values set once (but not if temp_max_watts screen is active)
+                if shared_state.rotary_last_mode != "setpoint" and not shared_state.temp_max_watts_screen_active:
                     input_handler.setup_rotary_values()
                 shared_state.current_menu_position = 1
                 # start async home-screen updater (no-op if already running)

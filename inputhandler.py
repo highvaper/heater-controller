@@ -4,7 +4,7 @@ from rotary_irq_rp2 import RotaryIRQ
 from customtimer import CustomTimer
 
 class InputHandler:
-    def __init__(self, rotary_clk_pin, rotary_dt_pin, button_pin, switch_control_pin, shared_state):
+    def __init__(self, rotary_clk_pin, rotary_dt_pin, button_pin, switch_control_pin, middle_button_pin, shared_state):
     
         print("InputHandler Initialising ...")
         self.rotary = RotaryIRQ(pin_num_clk=rotary_clk_pin, pin_num_dt=rotary_dt_pin, reverse=True, range_mode=RotaryIRQ.RANGE_BOUNDED)
@@ -28,6 +28,9 @@ class InputHandler:
         self.switch_control_button_pressed = False
         self.switch_control_button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.switch_control_button_state_changed)
 
+        self.middle_button = Pin(middle_button_pin, Pin.IN, Pin.PULL_UP)
+        self.middle_button_pressed = False
+        self.middle_button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.middle_button_state_changed)
         
         print("InputHandler initialised.")
 
@@ -58,6 +61,15 @@ class InputHandler:
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Display Contrast"
             print("setup rotarty contrast" + str(self.rotary.value()))
+
+        elif self.shared_state.temp_max_watts_screen_active and self.shared_state.rotary_last_mode != "Temp Max Watts":
+            self.rotary.set(value=self.shared_state.temp_max_watts)
+            self.previous_rotary_value = self.shared_state.temp_max_watts
+            self.rotary.set(min_val=0)
+            self.rotary.set(max_val=self.shared_state.max_watts)
+            self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
+            self.shared_state.rotary_last_mode = "Temp Max Watts"
+            print("setup rotary temp_max_watts" + str(self.rotary.value()))
 
         elif self.shared_state.rotary_last_mode != "Show Settings" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Show Settings":
             self.rotary.set(value=self.shared_state.show_settings_line)
@@ -109,6 +121,11 @@ class InputHandler:
             elif self.shared_state.rotary_last_mode == "Display Contrast":
                 # Update display contrast
                 self.shared_state.display_contrast = self.rotary.value()
+            elif self.shared_state.rotary_last_mode == "Temp Max Watts":
+                # Update temp_max_watts and reset timeout
+                self.shared_state.temp_max_watts = self.rotary.value()
+                self.shared_state.temp_max_watts_start_time = utime.ticks_ms()
+                print(f"Temp Max Watts updated to: {self.shared_state.temp_max_watts}")
             elif self.shared_state.rotary_last_mode == "Show Settings":
                 # Update show settings line
                 self.shared_state.show_settings_line = self.rotary.value()
@@ -271,5 +288,12 @@ class InputHandler:
                 self.previous_rotary_value = self.shared_state.temperature_setpoint
             # Force rotary_last_mode to None so setup_rotary_values will update the limits
             self.shared_state.rotary_last_mode = None
-            self.setup_rotary_values()
+
+    def middle_button_state_changed(self, pin):
+        if pin.value() == 0: # Button is pressed
+            if not self.middle_button_pressed:
+                self.middle_button_pressed = True
+                self.shared_state.middle_button_pressed = True
+        else: # Button is released
+            self.middle_button_pressed = False
 

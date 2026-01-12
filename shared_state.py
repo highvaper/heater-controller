@@ -40,6 +40,7 @@ class SharedState:
                              #Note: 14 awg copper wire rated max amp is about 15amp - so at 12v = 180w max power to be safe
                              #Keep to 100w for single mosfet unit if doing them in parrallel then ok to go more
 
+        self.temp_max_watts = self.max_watts  # Temperature Max Watts variable - defaults to max_watts
         self.heater_max_duty_cycle_percent = 0 #this now gets adjusted automatically based on max_watts / watt level
         self.input_volts = False  # Needs to be False at startup
         
@@ -130,6 +131,9 @@ class SharedState:
         self.current_menu_position = 0 
         self.menu_selection_pending = False 
         self.menu_timeout = 3 * 1000   # 3 secs
+        self.middle_button_pressed = False  # Flag to display temp_max_watts screen
+        self.temp_max_watts_screen_active = False  # Track if temp_max_watts screen is displayed
+        self.temp_max_watts_start_time = 0  # Track time when screen was first shown
         
         self.rotary_direction = None
         self.rotary_last_mode = None
