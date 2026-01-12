@@ -268,9 +268,8 @@ class SharedState:
             self.heater_on_temperature_difference_threshold = profile_config['heater_on_temperature_difference_threshold']
         if 'max_watts' in profile_config:
             self.max_watts = profile_config['max_watts']
-            # Reset temp_max_watts if profile's max_watts is less than current temp_max_watts
-            if self.max_watts < self.temp_max_watts:
-                self.temp_max_watts = self.max_watts
+            # Set temp_max_watts to match max_watts from profile
+            self.temp_max_watts = self.max_watts
         if 'heater_resistance' in profile_config:
             self.heater_resistance = profile_config['heater_resistance']
         if 'display_contrast' in profile_config:
