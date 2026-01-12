@@ -27,7 +27,7 @@ def load_profile(profile_name, shared_state):
                             # Handle new key names (map to old attribute names for compatibility)
                             if key in ['session_timeout', 'session_extend_time', 'temperature_setpoint', 'power_threshold',
                                       'heater_on_temperature_difference_threshold', 'max_watts', 'click_check_timeout',
-                                      'temperature_max_allowed_setpoint', 'set_watts', 'set_duty_cycle', 'lipo_count', 'pi_temperature_limit']:
+                                      'temperature_max_allowed_setpoint', 'set_watts', 'lipo_count', 'pi_temperature_limit']:
                                 config[key] = int(value)
                                 if key == 'session_timeout':
                                     config[key] = int(value) * 1000  # Convert to milliseconds
@@ -53,11 +53,16 @@ def load_profile(profile_name, shared_state):
                                         config[key] = int(value)
                                     else:
                                         print(f"Warning: setwatts out of range (0-150): {value}")
-                                elif key == 'set_duty_cycle':
-                                    if int(value) >= 0 and int(value) <= 100:
-                                        config[key] = int(value)
+                            elif key == 'set_duty_cycle':
+                                # Allow decimal duty cycle values (e.g., 12.3 for 12.3%)
+                                try:
+                                    dc = float(value)
+                                    if 0.0 <= dc <= 100.0:
+                                        config[key] = dc
                                     else:
                                         print(f"Warning: set_duty_cycle out of range (0-100): {value}")
+                                except ValueError:
+                                    print(f"Warning: Could not parse set_duty_cycle value: {value}")
                             elif key in ['heater_resistance', 'lipo_safe_volts', 'lead_safe_volts', 'mains_safe_volts']:
                                 config[key] = float(value)
                             elif key in ['display_contrast']:

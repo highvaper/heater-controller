@@ -79,10 +79,11 @@ class InputHandler:
                     self.rotary.set(min_val=0)
                     self.rotary.set(max_val=self.shared_state.max_watts)
                 elif self.shared_state.control == 'duty_cycle':
-                    self.rotary.set(value=self.shared_state.set_duty_cycle)
-                    self.previous_rotary_value = self.shared_state.set_duty_cycle
+                    # Rotary works in integer steps; map 0-1000 to 0.0-100.0% (0.1% steps)
+                    self.rotary.set(value=int(self.shared_state.set_duty_cycle * 10))
+                    self.previous_rotary_value = int(self.shared_state.set_duty_cycle * 10)
                     self.rotary.set(min_val=0)
-                    self.rotary.set(max_val=100)
+                    self.rotary.set(max_val=1000)
                 else:
                     self.rotary.set(value=self.shared_state.temperature_setpoint)
                     self.previous_rotary_value = self.shared_state.temperature_setpoint
@@ -113,7 +114,27 @@ class InputHandler:
                 self.shared_state.show_settings_line = self.rotary.value()
             else:
                 # Regular setpoint/watts adjustment
-                adjustment_rate = 10 if self.button_pressed else 0
+                # Determine adjustment per rotary detent.
+                # For duty_cycle (rotary scale 0-1000 = 0.0-100.0%), use 10 tenths (1%) steps when under 10.0%,
+                # otherwise use 100 tenths (10%) steps. Apply this regardless of button state.
+                if self.shared_state.control == 'duty_cycle':
+                    cur = self.rotary.value()
+                    if self.button_pressed:
+                        # Button pressed: larger jumps (1% under 10%, 10% above)
+                        if cur < 100:  # less than 10.0%
+                            adjustment_rate = 10
+                        else:
+                            adjustment_rate = 100
+                    else:
+                        # Button not pressed: fine adjustments (0.1% under 10%, 1% above)
+                        if cur < 100:
+                            adjustment_rate = 1
+                        else:
+                            adjustment_rate = 10
+                else:
+                    # Non-duty controls: accelerate when button is held, otherwise single-step only
+                    adjustment_rate = 10 if self.button_pressed else 0
+
                 if self.rotary.value() > self.previous_rotary_value:
                     self.rotary.set(value=self.rotary.value() + adjustment_rate)
                 else:
@@ -122,7 +143,8 @@ class InputHandler:
                 if self.shared_state.control == 'watts':
                     self.shared_state.set_watts = self.rotary.value()
                 elif self.shared_state.control == 'duty_cycle':
-                    self.shared_state.set_duty_cycle = self.rotary.value()
+                    # Convert rotary integer (tenths of percent) back to float percent
+                    self.shared_state.set_duty_cycle = float(self.rotary.value()) / 10.0
                 else:
                     self.shared_state.temperature_setpoint = self.rotary.value()
 
@@ -241,8 +263,9 @@ class InputHandler:
                 self.rotary.set(value=self.shared_state.set_watts)
                 self.previous_rotary_value = self.shared_state.set_watts
             elif new_control == 'duty_cycle':
-                self.rotary.set(value=self.shared_state.set_duty_cycle)
-                self.previous_rotary_value = self.shared_state.set_duty_cycle
+                # Map float percent to rotary integer (tenths of percent)
+                self.rotary.set(value=int(self.shared_state.set_duty_cycle * 10))
+                self.previous_rotary_value = int(self.shared_state.set_duty_cycle * 10)
             else:  # temperature_pid
                 self.rotary.set(value=self.shared_state.temperature_setpoint)
                 self.previous_rotary_value = self.shared_state.temperature_setpoint

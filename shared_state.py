@@ -20,7 +20,7 @@ class SharedState:
         #self.control = 'watts'
         #self.control = 'duty_cycle'
         self.set_watts = 30  # like setpoint but for watts
-        self.set_duty_cycle = 50  # Duty cycle percentage (0-100%) when control='duty_cycle'
+        self.set_duty_cycle = 50.0  # Duty cycle percentage (0-100%) when control='duty_cycle' (supports 0.1% steps)
         
         
         self.power_type = 'mains'
@@ -333,7 +333,7 @@ class SharedState:
             'temperature_setpoint': 165,
             'control': 'temperature_pid',
             'set_watts': 30,
-            'set_duty_cycle': 50,
+            'set_duty_cycle': 50.0,
             'power_type': 'mains',
             'lipo_count': 4,
             'lipo_safe_volts': 3.3,

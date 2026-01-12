@@ -449,7 +449,19 @@ class DisplayManager:
                 t = t + " T: " + str(int(shared_state.heater_temperature)) + "C"
             self.display.text(t, 0, 8)
         elif self.shared_state.control == 'duty_cycle':
-            t = "DC: " + str(int(heater.get_power())) + "% (" + str(shared_state.set_duty_cycle) + "%)"
+            # Show duty-cycle: use integer display when set value > 10%,
+            # otherwise show one decimal (0.1% resolution).
+            try:
+                if shared_state.set_duty_cycle > 10:
+                    t = "DC: {}% ({}%)".format(int(heater.get_power()), int(shared_state.set_duty_cycle))
+                else:
+                    t = "DC: {:.1f}% ({:.1f}%)".format(heater.get_power(), shared_state.set_duty_cycle)
+            except Exception:
+                # Fallback to simple string
+                if isinstance(shared_state.set_duty_cycle, float) and shared_state.set_duty_cycle > 10:
+                    t = "DC: {}% ({}%)".format(int(shared_state.set_duty_cycle), int(shared_state.set_duty_cycle))
+                else:
+                    t = "DC: " + str(shared_state.set_duty_cycle) + "%"
             self.display.text(t, 0, 0)
             t = "V: " + "{:.1f}".format(shared_state.input_volts) + "V"
             if shared_state.temperature_units == 'F':
