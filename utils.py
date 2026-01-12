@@ -270,7 +270,9 @@ def get_input_volts(previous_reading):
     
 
 def buzzer_play_tone(buzzer, frequency, duration):
-    #need to do this as a separate thread as this blocks
+    #for time being just return here - we will make this asunchronous later
+    return
+    #need to do this asynchronously as this blocks
     buzzer.freq(frequency)
     #buzzer.duty_u16(32768) # 50% duty cycle
     buzzer.duty_u16(10000) # 
