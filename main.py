@@ -633,8 +633,9 @@ async def async_main():
                             shared_state.pid.reset()
                 else:
                     #Need to make '15' in shared state so can be set via profile
+                    #If reached setpoint and then temperature drops dramatically Integral can increase to much 
                     #need to catch runaway temp here after we have already reached setpointand reset pid stats 
-                    if shared_state.heater_temperature > (shared_state.temperature_setpoint + 15):
+                    if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
                         shared_state.pid.reset()
 
         if enable_watchdog:

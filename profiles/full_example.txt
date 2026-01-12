@@ -1,6 +1,6 @@
 # Comprehensive Profile - All Configuration Options
 # This file shows all available settings that can be loaded into SharedState
-# Missing values will use defaults from the current shared_state
+# Missing values will use defaults from shared_state
 
 # ===== TEMPERATURE & CONTROL =====
 # Temperature unit: string ('C' or 'F')
@@ -84,11 +84,11 @@ pi_temperature_limit=60
 
 # ===== PID TUNING =====
 # PID tuning parameters: float,float,float (P,I,D values)
-# These control how aggressively the PID responds to temperature changes
-# Example tunings for different setups:
-# - 2x LIPO batteries: 2.3,0.03,0
-# - Single element heater: 0.33,0.0011,0
+# These control how the PID responds to temperature changes
 pid_tunings=2.3,0.03,0
+
+# Degrees above setpoint at which PID will be reset if temperature spikes after reaching setpoint
+pid_reset_high_temperature=15
 
 # ===== DISPLAY =====
 # Display contrast level: int (0-255)

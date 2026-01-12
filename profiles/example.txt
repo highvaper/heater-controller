@@ -11,3 +11,5 @@ max_watts=71
 
 # PID tuning for this specific heater setup (P,I,D)
 pid_tunings = 2.3,0.03,0
+# Degrees above setpoint at which PID will be reset if temperature spikes after reaching setpoint
+pid_reset_high_temperature=15

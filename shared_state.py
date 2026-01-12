@@ -55,6 +55,7 @@ class SharedState:
         self.session_timeout = 7 * 60 * 1000       # length of time for a session before auto off (7 mins)
         self.session_extend_time = 2 * 60 * 1000   # length of time to extens senssion by when single click in last minute of session
         self.session_reset_pid_when_near_setpoint = True # Reset PID stats once near setpoint to reduce overshoot
+        self.pid_reset_high_temperature = 15  # degrees above setpoint to reset PID when already reached setpoint
 
         
         # When in session mode and we first hist setpoint make led change colour ?  and / or sound a buzzer 
@@ -274,6 +275,8 @@ class SharedState:
         if 'pid_tunings' in profile_config:
             self.pid_tunings = profile_config['pid_tunings']
             self.pid.tunings = self.pid_tunings  # Update PID tunings immediately
+        if 'pid_reset_high_temperature' in profile_config:
+            self.pid_reset_high_temperature = profile_config['pid_reset_high_temperature']
         
         print(f"Profile applied to SharedState")
     
@@ -312,4 +315,5 @@ class SharedState:
             'temperature_max_allowed_setpoint': 250,
             'pi_temperature_limit': 60,
             'pid_tunings': (2.3, 0.03, 0),
+            'pid_reset_high_temperature': 15,
         }
