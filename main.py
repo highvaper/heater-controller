@@ -711,6 +711,9 @@ async def async_main():
             if shared_state.get_mode() == "autosession":
                 # Start logging if not already active
                 if not shared_state.autosession_logging_active:
+                    # Ensure any previous buffer is flushed before starting new logging
+                    if shared_state.autosession_log_file is not None:
+                        flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
                     shared_state.autosession_logging_active = True
                     shared_state.autosession_log_file, _ = create_autosession_log_file(shared_state.profile, shared_state.autosession_profile_name)
                     shared_state.autosession_log_buffer = []

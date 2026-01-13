@@ -38,7 +38,7 @@ def create_autosession_log_file(profile_name, autosession_profile_name):
         
         # Create and write header
         f = open(filename, 'w')
-        header = 'elapsed_s,heater_temp_c,setpoint_c,input_volts,watts\n'
+        header = 'elapsed_s,heater_temp_c,setpoint_c,input_volts,power_percent,watts\n'
         f.write(header)
         f.flush()
         print(f"Created autosession log: {filename}")
@@ -47,7 +47,7 @@ def create_autosession_log_file(profile_name, autosession_profile_name):
         print(f"Error creating autosession log file: {e}")
         return None, None
 
-def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, temperature_setpoint, input_volts, watts, autosession_log_buffer_flush_threshold):
+def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, temperature_setpoint, input_volts, power_percent, watts, autosession_log_buffer_flush_threshold):
     """
     Buffer autosession data and flush when buffer reaches configured threshold.
     Returns updated buffer and file object (or None if closed).
@@ -57,7 +57,7 @@ def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, t
             return log_buffer, log_file
         
         elapsed_s = elapsed_ms / 1000.0
-        line = f'{elapsed_s:.1f},{int(heater_temperature)},{int(temperature_setpoint)},{input_volts:.2f},{int(watts)}\n'
+        line = f'{elapsed_s:.1f},{int(heater_temperature)},{int(temperature_setpoint)},{input_volts:.2f},{int(power_percent)},{int(watts)}\n'
         log_buffer.append(line)
         
         # Flush when buffer reaches configured threshold
@@ -66,6 +66,12 @@ def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, t
                 log_file.write(data_line)
             log_file.flush()
             log_buffer = []
+            # On MicroPython, also call fsync if available for extra safety
+            try:
+                import os
+                os.fsync(log_file.fileno())
+            except (AttributeError, OSError):
+                pass  # fsync not available on this platform
         
         return log_buffer, log_file
     except Exception as e:
@@ -80,6 +86,12 @@ def flush_autosession_log(log_file, log_buffer):
                 for line in log_buffer:
                     log_file.write(line)
             log_file.flush()
+            # On MicroPython, also call fsync if available for extra safety
+            try:
+                import os
+                os.fsync(log_file.fileno())
+            except (AttributeError, OSError):
+                pass  # fsync not available on this platform
             log_file.close()
             print("Autosession log flushed and closed")
     except Exception as e:
