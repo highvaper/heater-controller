@@ -203,7 +203,8 @@ def apply_and_save_autosession_profile(profile_name, shared_state):
         else:
             profile_value = profile_string.strip()
         shared_state.autosession_profile = AutoSessionTemperatureProfile(profile_value)
-        shared_state.set_autosession_profile_name(profile_name)
+        shared_state.autosession_profile_name = profile_name
+        print(f"Autosession profile set to: {profile_name}")
         # Save as current autosession profile
         try:
             with open('/current_autosession_profile.txt', 'w') as f:

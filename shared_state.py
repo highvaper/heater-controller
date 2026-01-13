@@ -342,12 +342,7 @@ class SharedState:
         print(f"Profile set to: {self.profile}")
 
 
-    def set_autosession_profile_name(self, autosession_profile_name):
-        """Update the autosession profile name."""
-        self.autosession_profile_name = autosession_profile_name
-        print(f"Autosession profile set to: {self.autosession_profile_name}")
         
-         
     def initialize_defaults(self):
         """Return a dictionary with all hardcoded default configuration values.
         Used when loading profiles to ensure they start from a known baseline."""
