@@ -53,6 +53,16 @@ class InputHandler:
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Profiles" 
             print(f"setup rotary profiles: index={self.rotary.value()}, max={max_profiles}")
+        elif self.shared_state.rotary_last_mode != "Autosession Profiles" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Autosession Profiles":
+            # Handle autosession profile selection
+            self.rotary.set(value=self.shared_state.autosession_profile_selection_index)
+            self.previous_rotary_value = self.shared_state.autosession_profile_selection_index
+            self.rotary.set(min_val=0)
+            max_autosession = len(self.shared_state.autosession_profile_list) - 1 if self.shared_state.autosession_profile_list else 0
+            self.rotary.set(max_val=max_autosession)
+            self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
+            self.shared_state.rotary_last_mode = "Autosession Profiles"
+            print(f"setup rotary autosession profiles: index={self.rotary.value()}, max={max_autosession}")
         elif self.shared_state.rotary_last_mode != "Display Contrast" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Display Contrast":
             self.rotary.set(value=self.shared_state.display_contrast)
             self.previous_rotary_value = self.shared_state.display_contrast
@@ -118,6 +128,9 @@ class InputHandler:
             if self.shared_state.rotary_last_mode == "Profiles":
                 # Handle profile selection
                 self.shared_state.profile_selection_index = self.rotary.value()
+            elif self.shared_state.rotary_last_mode == "Autosession Profiles":
+                # Handle autosession profile selection
+                self.shared_state.autosession_profile_selection_index = self.rotary.value()
             elif self.shared_state.rotary_last_mode == "Display Contrast":
                 # Update display contrast
                 self.shared_state.display_contrast = self.rotary.value()
@@ -206,6 +219,8 @@ class InputHandler:
                 # Handle profile selection click - just set flag, let main loop handle display
                 if self.shared_state.rotary_last_mode == "Profiles":
                     self.shared_state.profile_load_pending = True
+                elif self.shared_state.rotary_last_mode == "Autosession Profiles":
+                    self.shared_state.autosession_profile_load_pending = True
                 # Handle session extend in last minute
                 elif self.shared_state.get_mode() == "Session":
                     if (self.shared_state.session_timeout - self.shared_state.get_session_mode_duration()) < 60000:

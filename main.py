@@ -21,7 +21,7 @@ from menusystem import MenuSystem
 
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
-from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile
+from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles
 
 
 from shared_state import SharedState
@@ -331,8 +331,17 @@ print("Display initialised.")
 shared_state = SharedState(led_red_pin=led_red_pin, led_green_pin=led_green_pin, led_blue_pin=led_blue_pin)
 
 # Load profile list at startup (like show_settings loads all settings once)
+
+
+
+# Load normal profiles list
 shared_state.profile_list = list_profiles()
 shared_state.profile_selection_index = 0
+
+# Load autosession profiles list (do not load profile itself)
+shared_state.autosession_profile_list = list_autosession_profiles()
+shared_state.autosession_profile_selection_index = 0
+
 
 # Load saved default profile if it exists
 try:
@@ -348,9 +357,26 @@ try:
 except OSError:
     print("No /current_profile.txt found, using default settings")
 
+
+
+# Load saved autosession profile if it exists
+try:
+    with open('/current_autosession_profile.txt', 'r') as f:
+        autosession_profile_name = f.readline().strip()
+    if autosession_profile_name:
+        print(f"Loading autosession profile: {autosession_profile_name}")
+        success, message = apply_and_save_autosession_profile(autosession_profile_name, shared_state)
+        print(message)
+    else:
+        print("No autosession profile name found in /current_autosession_profile.txt")
+except OSError:
+    print("No /current_autosession_profile.txt found, skipping autosession profile load")
+
 #config = load_config(display)  # need to get config before displaymanager setup perhaps? so if error still need to show user
 #shared_state = SharedState(config)
  
+
+
 
 # DisplayManager
 try:
@@ -506,6 +532,10 @@ print("Timers initialised.")
 ############### 
 
 
+# After heater is initialized and before entering the event loop, start the home screen
+display_manager.start_home(heater, loop=asyncio.get_event_loop(), interval_ms=200)
+
+
 
 # Lets enable and see if it helps when heater on and we crash
 # So far from simulated tests this seems to work and heater pin is reset
@@ -549,11 +579,7 @@ async def async_main():
             except Exception:
                 pass
 
-    # Show startup screen asynchronously if possible
-    try:
-        display_manager.show_startup_screen()
-    except Exception:
-        pass
+    display_manager.show_startup_screen()
 
     while True:
         # Check and display any active errors
@@ -596,10 +622,18 @@ async def async_main():
                 # Check if user clicked on profiles screen to load a profile
                 if shared_state.rotary_last_mode == "Profiles" and shared_state.profile_load_pending:
                     if shared_state.profile_list:
-                        profile_name = shared_state.profile_list[shared_state.profile_selection_index]
-                        success, message = apply_and_save_profile(profile_name, shared_state)
+                        success, message = apply_and_save_profile(shared_state.profile_list[shared_state.profile_selection_index], shared_state)
                         #display_manager.display_error(message, 2, False)
                     shared_state.profile_load_pending = False
+                    # Return to home screen
+                    shared_state.current_menu_position = 1
+                    shared_state.rotary_last_mode = None
+                # Check if user clicked on autosession profiles screen to load an autosession profile
+                elif shared_state.rotary_last_mode == "Autosession Profiles" and shared_state.autosession_profile_load_pending:
+                    if shared_state.autosession_profile_list:
+                        success, message = apply_and_save_autosession_profile(shared_state.autosession_profile_list[shared_state.autosession_profile_selection_index], shared_state)
+                        #display_manager.display_error(message, 2, False)
+                    shared_state.autosession_profile_load_pending = False
                     # Return to home screen
                     shared_state.current_menu_position = 1
                     shared_state.rotary_last_mode = None

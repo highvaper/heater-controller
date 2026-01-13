@@ -4,6 +4,7 @@ import uasyncio as asyncio
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
 class DisplayManager:
+
     
     def __init__(self, display, shared_state):
     
@@ -566,8 +567,6 @@ class DisplayManager:
         
         profile_name = profile_list[idx]
         position_text = f"{idx + 1}/{len(profile_list)}"
-        #print("Profile:", profile_name, "Position:", position_text)
-        # Display profile name
         display_text = f"{profile_name}"
         
         # Show on first line
@@ -576,6 +575,25 @@ class DisplayManager:
         # Show position on second line  
         self.display.text(position_text, 0, 8, 1)
         
+        self.display.show()
+
+    def show_screen_autosession_profiles(self):
+        self.display.fill(0)
+        autosession_list = self.shared_state.autosession_profile_list
+        if not autosession_list:
+            self.display.text("No autosession", 0, 0, 1)
+            self.display.text("profiles found", 0, 8, 1)
+            self.display.show()
+            return
+        idx = self.shared_state.autosession_profile_selection_index
+        if idx >= len(autosession_list):
+            idx = len(autosession_list) - 1
+            self.shared_state.autosession_profile_selection_index = idx
+        profile_name = autosession_list[idx]
+        position_text = f"{idx + 1}/{len(autosession_list)}"
+        display_text = f"{profile_name}"
+        self.display.text(display_text, 0, 0, 1)
+        self.display.text(position_text, 0, 8, 1)
         self.display.show()
 
 
@@ -616,7 +634,7 @@ class DisplayManager:
         method = getattr(self, method_name, None)
         if method:
             # Keep graph-like and interactive screens displayed in a small async loop so they yield
-            graph_options = {'graph_bar', 'graph_line', 'graph_setpoint', 'temp_watts_line', 'watts_line', 'profiles', 'show_settings'}
+            graph_options = {'graph_bar', 'graph_line', 'graph_setpoint', 'temp_watts_line', 'watts_line', 'profiles', 'show_settings', 'autosession_profiles'}
             #if asyncio and option in graph_options:
             if option in graph_options:
                 try:
