@@ -282,7 +282,7 @@ class DisplayManager:
         for time, temp in temperature_readings.items():
             x = int((time - self.shared_state.temperature_min_time) * (self.display.width / (self.shared_state.temperature_max_time - self.shared_state.temperature_min_time)))
             # Calculate the y-coordinate relative to the setpoint
-            y = (setpoint_y + (temp - setpoint) * -1)
+            y = int(setpoint_y + (temp - setpoint) * -1)
             # Ensure y-coordinate does not go below 0 or above the display height
             #y = max(min(y, display_height - 1), 0)
             if abs(temp - setpoint) < zoom_range:

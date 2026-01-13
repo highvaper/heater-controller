@@ -45,7 +45,7 @@ class InputHandler:
             self.rotary.set(max_val=len(self.shared_state.menu_options)-1)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_WRAP)
             self.shared_state.rotary_last_mode = "menu"
-            print("setup rotarty menu" + str(self.rotary.value()))
+            #print("setup rotarty menu" + str(self.rotary.value()))
         elif not self.shared_state.in_menu and self.shared_state.rotary_last_mode != "autosession" and self.shared_state.get_mode() == "autosession":
             # Setup rotary for autosession time adjustment - PRIORITY over setpoint when autosession is running
             # Rotary position represents current position in the profile (0 = start, max = end)
@@ -63,7 +63,7 @@ class InputHandler:
             self.rotary.set(max_val=max_steps)   # End of profile
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "autosession"
-            print(f"setup rotary autosession time adjustment: 0 to {max_steps} steps (step_size={self.shared_state.autosession_time_adjustment_step}s)")
+            #print(f"setup rotary autosession time adjustment: 0 to {max_steps} steps (step_size={self.shared_state.autosession_time_adjustment_step}s)")
         elif self.shared_state.rotary_last_mode != "Profiles" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Profiles":
             # Handle profile selection like show_settings
             self.rotary.set(value=self.shared_state.profile_selection_index)
@@ -73,7 +73,7 @@ class InputHandler:
             self.rotary.set(max_val=max_profiles)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Profiles" 
-            print(f"setup rotary profiles: index={self.rotary.value()}, max={max_profiles}")
+            #print(f"setup rotary profiles: index={self.rotary.value()}, max={max_profiles}")
         elif self.shared_state.rotary_last_mode != "Autosession Profiles" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Autosession Profiles":
             # Handle autosession profile selection
             self.rotary.set(value=self.shared_state.autosession_profile_selection_index)
@@ -83,7 +83,7 @@ class InputHandler:
             self.rotary.set(max_val=max_autosession)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Autosession Profiles"
-            print(f"setup rotary autosession profiles: index={self.rotary.value()}, max={max_autosession}")
+            #print(f"setup rotary autosession profiles: index={self.rotary.value()}, max={max_autosession}")
         elif self.shared_state.rotary_last_mode != "Display Contrast" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Display Contrast":
             self.rotary.set(value=self.shared_state.display_contrast)
             self.previous_rotary_value = self.shared_state.display_contrast
@@ -91,7 +91,7 @@ class InputHandler:
             self.rotary.set(max_val=255)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Display Contrast"
-            print("setup rotarty contrast" + str(self.rotary.value()))
+            #print("setup rotarty contrast" + str(self.rotary.value()))
 
         elif self.shared_state.temp_max_watts_screen_active and self.shared_state.rotary_last_mode != "Temp Max Watts":
             self.rotary.set(value=self.shared_state.temp_max_watts)
@@ -100,7 +100,7 @@ class InputHandler:
             self.rotary.set(max_val=self.shared_state.max_watts)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Temp Max Watts"
-            print("setup rotary temp_max_watts" + str(self.rotary.value()))
+            #print("setup rotary temp_max_watts" + str(self.rotary.value()))
 
         elif self.shared_state.rotary_last_mode != "Show Settings" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Show Settings":
             self.rotary.set(value=self.shared_state.show_settings_line)
@@ -111,7 +111,7 @@ class InputHandler:
             self.rotary.set(max_val=settings_count)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Show Settings"
-            print("setup rotarty show settings" + str(self.rotary.value()))
+            #print("setup rotarty show settings" + str(self.rotary.value()))
 
         else:
             #need to update to temperature-setpoint and for when we have watts-pid control
@@ -135,7 +135,7 @@ class InputHandler:
                 
                 self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
                 self.shared_state.rotary_last_mode = "setpoint"
-                print("setup rotarty setpoint" + str(self.rotary.value()))
+                #print("setup rotarty setpoint" + str(self.rotary.value()))
 
     def rotary_callback(self):
         current_menu_option = self.shared_state.menu_options[self.shared_state.current_menu_position] if self.shared_state.current_menu_position < len(self.shared_state.menu_options) else None
@@ -149,7 +149,7 @@ class InputHandler:
             step_ms = self.shared_state.autosession_time_adjustment_step * 1000  # Convert configured step (seconds) to milliseconds
             time_adjustment = delta * step_ms
             self.shared_state.autosession_start_time -= time_adjustment  # Move start time backward to advance profile, forward to rewind
-            print(f"Autosession rotary: current={current_value}, prev={self.previous_rotary_value}, delta={delta}, time_adj={time_adjustment}ms, new_start_time={self.shared_state.autosession_start_time}")
+            #print(f"Autosession rotary: current={current_value}, prev={self.previous_rotary_value}, delta={delta}, time_adj={time_adjustment}ms, new_start_time={self.shared_state.autosession_start_time}")
             self.previous_rotary_value = current_value
             return  # Exit early - don't process as normal setpoint
         
@@ -172,7 +172,7 @@ class InputHandler:
                 # Update temp_max_watts and reset timeout
                 self.shared_state.temp_max_watts = self.rotary.value()
                 self.shared_state.temp_max_watts_start_time = utime.ticks_ms()
-                print(f"Temp Max Watts updated to: {self.shared_state.temp_max_watts}")
+                #print(f"Temp Max Watts updated to: {self.shared_state.temp_max_watts}")
             elif self.shared_state.rotary_last_mode == "Show Settings":
                 # Update show settings line
                 self.shared_state.show_settings_line = self.rotary.value()
@@ -265,8 +265,8 @@ class InputHandler:
             if not self.shared_state.in_menu:
                 self.shared_state.in_menu = True
                 self.shared_state.rotary_direction = 'up' # Just Fake it and go to top of menu to force screen refresh
-            else:
-                print('Ignoring double click already in menu')
+            #else:
+                #print('Ignoring double click already in menu')
                 
         elif self.click_counter == 3:
             #print('Triple click detected')
@@ -294,8 +294,8 @@ class InputHandler:
                     self.shared_state.session_start_time = (utime.ticks_ms() - (self.shared_state.session_timeout - 60000))
                 #elif self.shared_state.get_mode() == "Session":
                 #    self.shared_state.set_mode("Off")
-        else:
-            print(self.click_counter, ' clicks detected')
+        #else:
+            #print(self.click_counter, ' clicks detected')
             
         self.click_counter = 0 # Reset the click counter
         if self.click_check_timer.is_timer_running():
