@@ -46,6 +46,24 @@ class InputHandler:
             self.rotary.set(range_mode=RotaryIRQ.RANGE_WRAP)
             self.shared_state.rotary_last_mode = "menu"
             print("setup rotarty menu" + str(self.rotary.value()))
+        elif not self.shared_state.in_menu and self.shared_state.rotary_last_mode != "autosession" and self.shared_state.get_mode() == "autosession":
+            # Setup rotary for autosession time adjustment - PRIORITY over setpoint when autosession is running
+            # Rotary position represents current position in the profile (0 = start, max = end)
+            if self.shared_state.autosession_profile:
+                profile_duration_ms = self.shared_state.autosession_profile.get_duration_ms()
+                # Use configurable autosession_time_adjustment_step from profile config (in seconds, convert to ms)
+                step_ms = self.shared_state.autosession_time_adjustment_step * 1000
+                max_steps = int(profile_duration_ms / step_ms)
+            else:
+                max_steps = 600  # Fallback if no profile
+            
+            self.rotary.set(value=0)
+            self.previous_rotary_value = 0
+            self.rotary.set(min_val=0)           # Start of profile
+            self.rotary.set(max_val=max_steps)   # End of profile
+            self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
+            self.shared_state.rotary_last_mode = "autosession"
+            print(f"setup rotary autosession time adjustment: 0 to {max_steps} steps (step_size={self.shared_state.autosession_time_adjustment_step}s)")
         elif self.shared_state.rotary_last_mode != "Profiles" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Profiles":
             # Handle profile selection like show_settings
             self.rotary.set(value=self.shared_state.profile_selection_index)
@@ -122,6 +140,19 @@ class InputHandler:
     def rotary_callback(self):
         current_menu_option = self.shared_state.menu_options[self.shared_state.current_menu_position] if self.shared_state.current_menu_position < len(self.shared_state.menu_options) else None
     
+        # PRIORITY: Check for autosession mode FIRST before anything else
+        if not self.shared_state.in_menu and self.shared_state.get_mode() == "autosession":
+            # Handle autosession time adjustment - this takes precedence over all other modes
+            # Adjust the start time directly so all elapsed calculations automatically use the adjusted time
+            current_value = self.rotary.value()
+            delta = current_value - self.previous_rotary_value
+            step_ms = self.shared_state.autosession_time_adjustment_step * 1000  # Convert configured step (seconds) to milliseconds
+            time_adjustment = delta * step_ms
+            self.shared_state.autosession_start_time -= time_adjustment  # Move start time backward to advance profile, forward to rewind
+            print(f"Autosession rotary: current={current_value}, prev={self.previous_rotary_value}, delta={delta}, time_adj={time_adjustment}ms, new_start_time={self.shared_state.autosession_start_time}")
+            self.previous_rotary_value = current_value
+            return  # Exit early - don't process as normal setpoint
+        
         if self.shared_state.in_menu:
             direction = 'up' if self.rotary.value() > self.previous_rotary_value else 'down'
             self.shared_state.rotary_direction = direction

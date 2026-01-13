@@ -191,20 +191,31 @@ def apply_and_save_autosession_profile(profile_name, shared_state):
             return False, f"Autosession profile '{profile_name}' not found"
         # Find the first non-comment, non-blank line starting with 'temperature_profile='
         temp_profile_line = None
+        time_adjustment_step = 10  # Default to 10 seconds if not specified
+        
         for line in profile_string.splitlines():
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
             if line.startswith('temperature_profile='):
                 temp_profile_line = line
-                break
+            elif line.startswith('time_adjustment_step='):
+                try:
+                    time_adjustment_step = int(line.split('=', 1)[1].strip())
+                except (ValueError, IndexError):
+                    print(f"Warning: Could not parse time_adjustment_step, using default 10 seconds")
+                    time_adjustment_step = 10
+        
         if temp_profile_line:
             profile_value = temp_profile_line.split('=', 1)[1].strip()
         else:
             profile_value = profile_string.strip()
+        
         shared_state.autosession_profile = AutoSessionTemperatureProfile(profile_value)
         shared_state.autosession_profile_name = profile_name
+        shared_state.autosession_time_adjustment_step = time_adjustment_step
         print(f"Autosession profile set to: {profile_name}")
+        print(f"Autosession time adjustment step: {time_adjustment_step} seconds")
         # Save as current autosession profile
         try:
             with open('/current_autosession_profile.txt', 'w') as f:

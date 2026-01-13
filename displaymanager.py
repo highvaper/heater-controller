@@ -494,6 +494,7 @@ class DisplayManager:
             if shared_state.get_mode() == "autosession":
                 # When autosession is running, display elapsed and remaining time
                 elapsed_ms = utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time)
+                elapsed_ms = max(0, elapsed_ms)  # Clamp to 0
                 elapsed_s = int(elapsed_ms / 1000)
                 remaining_ms = shared_state.autosession_profile.get_duration_ms() - elapsed_ms
                 remaining_s = max(0, int(remaining_ms / 1000))

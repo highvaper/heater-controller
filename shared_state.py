@@ -158,6 +158,8 @@ class SharedState:
         self.autosession_profile_name = None  # Name of loaded autosession profile
         self.autosession_active = False  # True when autosession is currently running
         self.autosession_start_time = 0  # Timestamp when autosession started
+        self.autosession_time_offset_ms = 0  # Rotary dial offset for autosession time in milliseconds (positive = advance, negative = rewind)
+        self.autosession_time_adjustment_step = 10  # Rotary dial step size in seconds for autosession time adjustment (loaded from profile config)
         
         self.session_start_time = 0
         self.session_setpoint_reached = False

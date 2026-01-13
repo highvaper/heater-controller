@@ -178,8 +178,10 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
 
     # Check if autosession is active and update setpoint if needed
     if shared_state.get_mode() == "autosession" and shared_state.autosession_profile:
-        # Calculate actual elapsed time since autosession start
+        # Calculate actual elapsed time since autosession start (adjusted by rotary dial)
         elapsed_ms = utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time)
+        # Clamp elapsed time to valid range (0 to profile duration)
+        elapsed_ms = max(0, elapsed_ms)
         
         profile_setpoint = shared_state.autosession_profile.get_setpoint_at_elapsed_time(elapsed_ms)
         
@@ -192,7 +194,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
             # End the session when autosession profile completes
             shared_state.set_mode("Off")
 
-    if shared_state.control == 'temperature_pid' or shared_state.control == 'autosession': 
+    if shared_state.control == 'temperature_pid' or shared_state.control == 'autosession':
         power = shared_state.pid(shared_state.heater_temperature)  # Update pid even if heater is off
     elif shared_state.control == 'duty_cycle':
         power = shared_state.set_duty_cycle  # Use duty cycle directly (0-100%)
@@ -630,7 +632,10 @@ async def async_main():
         elif not shared_state.in_menu:
             if shared_state.current_menu_position <= 1:
                 # ensure rotary values set once (but not if temp_max_watts screen is active)
-                if shared_state.rotary_last_mode != "setpoint" and not shared_state.temp_max_watts_screen_active:
+                # Also ensure rotary is reconfigured when autosession starts/stops
+                # Don't reconfigure if we're already in autosession mode with rotary set to autosession
+                if (shared_state.rotary_last_mode != "setpoint" and shared_state.rotary_last_mode != "autosession" and not shared_state.temp_max_watts_screen_active) or \
+                   (shared_state.get_mode() == "autosession" and shared_state.rotary_last_mode != "autosession"):
                     input_handler.setup_rotary_values()
                 shared_state.current_menu_position = 1
                 # start async home-screen updater (no-op if already running)
