@@ -275,9 +275,11 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         heater.off()  #Maybe we call this no matter what just in case?
     
  #   t = ','.join(map(str, [pid._last_time, shared_state.heater_temperature, thermocouple.raw_temp, pid.setpoint, power, heater.is_on(), pid.components]))
-    elapsed_s = (utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time) / 1000.0) if shared_state.get_mode() == "autosession" else 0.0
-    t = ','.join(map(str, ["{:.1f}".format(elapsed_s), int(shared_state.heater_temperature), int(shared_state.temperature_setpoint), int(power)]))
-    print(t)
+ 
+ # possibly log data for later analysis when in autosession mode add option to autoprofile config
+ #   elapsed_s = (utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time) / 1000.0) if shared_state.get_mode() == "autosession" else 0.0
+ #   t = ','.join(map(str, ["{:.1f}".format(elapsed_s), int(shared_state.heater_temperature), int(shared_state.temperature_setpoint), int(power)]))
+ #   print(t)
 
 
 
@@ -708,6 +710,10 @@ async def async_main():
                 #need to reset pid if big temp change from setpoint too
                 if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
                     shared_state.pid.reset()    
+                #need to do something like we do for session when first approaching setpoint
+                #but we need to be able to reset it each time we approach setpoint from below a certain value and perhaps apply to normal session as well
+                #elif shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
+               #     shared_state.pid.reset()  
 
         if enable_watchdog:
             try:

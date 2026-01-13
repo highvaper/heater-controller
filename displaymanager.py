@@ -481,8 +481,11 @@ class DisplayManager:
 
         t = "M: " + shared_state.get_mode()
         if shared_state.get_mode() == "autosession":
-            # Show Auto Session instead of just the mode
-            t = "M: Auto Session"
+            # Show Auto Session with profile name
+            if shared_state.autosession_profile_name:
+                t = "M: " + shared_state.autosession_profile_name
+            else:
+                t = "M: Auto Session"
         elif shared_state.get_mode() == "Session":
             t = t + " " + str(int((shared_state.session_timeout - shared_state.get_session_mode_duration())/1000)) + "s"
         self.display.text(t, 0, 16)

@@ -13,4 +13,4 @@ max_watts=85
 pid_temperature_tunings = 2.3,0.03,0
 
 # Degrees above setpoint at which PID will be reset if temperature spikes after reaching setpoint
-pid_reset_high_temperature=12
+pid_reset_high_temperature=8
