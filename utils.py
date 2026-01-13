@@ -10,6 +10,82 @@ from machine import ADC
 
 from autosession import AutoSessionTemperatureProfile
 
+
+def create_autosession_log_file(profile_name, autosession_profile_name):
+    """
+    Create a new CSV file for autosession logging.
+    Filename format: autosession_logs/profile_name_autosession_profile_name_0.csv
+    Creates directory if it doesn't exist.
+    Returns (file_object, filename) or (None, None) on error.
+    """
+    try:
+        import os
+        # Create directory if it doesn't exist
+        try:
+            os.mkdir('/autosession_logs')
+        except OSError:
+            pass  # Directory already exists
+        
+        # Find next available number to avoid overwriting
+        counter = 0
+        while True:
+            filename = f'/autosession_logs/{profile_name}_{autosession_profile_name}_{counter}.csv'
+            try:
+                with open(filename, 'r'):
+                    counter += 1
+            except OSError:
+                break
+        
+        # Create and write header
+        f = open(filename, 'w')
+        header = 'elapsed_s,heater_temp_c,setpoint_c,input_volts,watts\n'
+        f.write(header)
+        f.flush()
+        print(f"Created autosession log: {filename}")
+        return f, filename
+    except Exception as e:
+        print(f"Error creating autosession log file: {e}")
+        return None, None
+
+def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, temperature_setpoint, input_volts, watts, autosession_log_buffer_flush_threshold):
+    """
+    Buffer autosession data and flush when buffer reaches configured threshold.
+    Returns updated buffer and file object (or None if closed).
+    """
+    try:
+        if log_file is None:
+            return log_buffer, log_file
+        
+        elapsed_s = elapsed_ms / 1000.0
+        line = f'{elapsed_s:.1f},{int(heater_temperature)},{int(temperature_setpoint)},{input_volts:.2f},{int(watts)}\n'
+        log_buffer.append(line)
+        
+        # Flush when buffer reaches configured threshold
+        if len(log_buffer) >= autosession_log_buffer_flush_threshold:
+            for data_line in log_buffer:
+                log_file.write(data_line)
+            log_file.flush()
+            log_buffer = []
+        
+        return log_buffer, log_file
+    except Exception as e:
+        print(f"Error logging autosession data: {e}")
+        return log_buffer, log_file
+
+def flush_autosession_log(log_file, log_buffer):
+    """Flush remaining buffered data and close file."""
+    try:
+        if log_file is not None:
+            if log_buffer:
+                for line in log_buffer:
+                    log_file.write(line)
+            log_file.flush()
+            log_file.close()
+            print("Autosession log flushed and closed")
+    except Exception as e:
+        print(f"Error flushing autosession log: {e}")
+
+
 def load_profile(profile_name, shared_state):
 
     # Start with defaults from SharedState.initialize_defaults()
@@ -30,7 +106,8 @@ def load_profile(profile_name, shared_state):
                             # Handle new key names (map to old attribute names for compatibility)
                             if key in ['session_timeout', 'session_extend_time', 'temperature_setpoint', 'power_threshold',
                                       'heater_on_temperature_difference_threshold', 'max_watts', 'click_check_timeout',
-                                      'temperature_max_allowed_setpoint', 'set_watts', 'lipo_count', 'pi_temperature_limit']:
+                                      'temperature_max_allowed_setpoint', 'set_watts', 'lipo_count', 'pi_temperature_limit',
+                                      'autosession_log_buffer_flush_threshold']:
                                 config[key] = int(value)
                                 if key == 'session_timeout':
                                     config[key] = int(value) * 1000  # Convert to milliseconds
@@ -56,6 +133,11 @@ def load_profile(profile_name, shared_state):
                                         config[key] = int(value)
                                     else:
                                         print(f"Warning: setwatts out of range (0-150): {value}")
+                                elif key == 'autosession_log_buffer_flush_threshold':
+                                    if int(value) > 0 and int(value) <= 200:
+                                        config[key] = int(value)
+                                    else:
+                                        print(f"Warning: autosession_log_buffer_flush_threshold out of range (1-200): {value}")
                             elif key == 'set_duty_cycle':
                                 # Allow decimal duty cycle values (e.g., 12.3 for 12.3%)
                                 try:
@@ -81,11 +163,16 @@ def load_profile(profile_name, shared_state):
                                     config[key] = int(value)
                                 else:
                                     print(f"Warning: display_contrast out of range (0-255): {value}")
-                            elif key in ['temperature_units']:
-                                if value in ['C', 'F']:
-                                    config[key] = value
-                                else:
-                                    print(f"Warning: temperature_units must be 'C' or 'F': {value}")
+                            elif key in ['temperature_units', 'default_autosession_profile']:
+                                # temperature_units: 'C' or 'F', default_autosession_profile: string profile name or empty
+                                if key == 'temperature_units':
+                                    if value in ['C', 'F']:
+                                        config[key] = value
+                                    else:
+                                        print(f"Warning: temperature_units must be 'C' or 'F': {value}")
+                                elif key == 'default_autosession_profile':
+                                    # Accept any non-empty string as a profile name, or empty string for None
+                                    config[key] = value if value else None
                             elif key in ['control']:
                                 if value in ['temperature_pid', 'watts']:
                                     config[key] = value
@@ -96,7 +183,7 @@ def load_profile(profile_name, shared_state):
                                     config[key] = value
                                 else:
                                     print(f"Warning: power_type must be 'mains', 'lipo', or 'lead': {value}")
-                            elif key in ['display_rotate', 'session_reset_pid_when_near_setpoint']:
+                            elif key in ['display_rotate', 'session_reset_pid_when_near_setpoint', 'autosession_logging_enabled']:
                                 config[key] = value.lower() in ['true', '1', 'yes']
                             elif key == 'pid_temperature_tunings':
                                 # Parse PID tunings as comma-separated float values: P,I,D
@@ -143,6 +230,13 @@ def apply_and_save_profile(profile_name, shared_state):
         shared_state.apply_profile(config)
         shared_state.set_profile_name(profile_name)
         shared_state.pid.reset() 
+        
+        # Load autosession profile if specified in the profile
+        if shared_state.default_autosession_profile:
+            print(f"Loading default autosession profile from profile: {shared_state.default_autosession_profile}")
+            success, message = apply_and_save_autosession_profile(shared_state.default_autosession_profile, shared_state)
+            print(message)
+        
         # Save as current profile
         try:
             with open('/current_profile.txt', 'w') as f:

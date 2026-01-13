@@ -80,6 +80,9 @@ class SharedState:
         self.display_contrast = 255
         self.display_rotate = True
         
+        # Autosession logging - whether to log autosession data to file
+        self.autosession_logging_enabled = False  # Disabled by default, enable in profile if needed
+        
         # Below is stuff perhaps better to leave alone
         self.click_check_timeout = 800 # ms timeout to multi click in 
         self.temperature_max_allowed_setpoint = 250 # max allowed temperature - need to protect ptfe around thermocouple
@@ -151,6 +154,7 @@ class SharedState:
         self.profile_load_pending = False  # Flag when user clicks to load profile
 
         # AUTOSESSION PROFILE SUPPORT
+        self.default_autosession_profile = None  # Default autosession profile name from loaded profile (or None to use current_autosession_profile.txt)
         self.autosession_profile_list = []  # List of available autosession profiles
         self.autosession_profile_selection_index = 0  # Current autosession profile selection in list
         self.autosession_profile_load_pending = False  # Flag when user clicks to load autosession profile
@@ -160,6 +164,10 @@ class SharedState:
         self.autosession_start_time = 0  # Timestamp when autosession started
         self.autosession_time_offset_ms = 0  # Rotary dial offset for autosession time in milliseconds (positive = advance, negative = rewind)
         self.autosession_time_adjustment_step = 10  # Rotary dial step size in seconds for autosession time adjustment (loaded from profile config)
+        self.autosession_logging_active = False  # True when CSV logging is active for current autosession
+        self.autosession_log_file = None  # File object for autosession CSV logging
+        self.autosession_log_buffer = []  # Buffer for autosession log data (flushed at configured threshold)
+        self.autosession_log_buffer_flush_threshold = 20  # Number of lines before buffer is flushed to file (can be set in profile)
         
         self.session_start_time = 0
         self.session_setpoint_reached = False
@@ -307,6 +315,12 @@ class SharedState:
             self.pid.tunings = self.pid_temperature_tunings  # Update PID tunings immediately
         if 'pid_reset_high_temperature' in profile_config:
             self.pid_reset_high_temperature = profile_config['pid_reset_high_temperature']
+        if 'autosession_logging_enabled' in profile_config:
+            self.autosession_logging_enabled = profile_config['autosession_logging_enabled']
+        if 'default_autosession_profile' in profile_config:
+            self.default_autosession_profile = profile_config['default_autosession_profile']
+        if 'autosession_log_buffer_flush_threshold' in profile_config:
+            self.autosession_log_buffer_flush_threshold = profile_config['autosession_log_buffer_flush_threshold']
 
         # If the profile requested a control mode, ensure it's enabled
         if 'control' in profile_config:
@@ -378,4 +392,7 @@ class SharedState:
             'pi_temperature_limit': 60,
             'pid_temperature_tunings': (2.3, 0.03, 0),
             'pid_reset_high_temperature': 15,
+            'autosession_logging_enabled': False,
+            'default_autosession_profile': None,
+            'autosession_log_buffer_flush_threshold': 20,
         }

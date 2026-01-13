@@ -14,3 +14,12 @@ pid_temperature_tunings = 2.3,0.03,0
 
 # Degrees above setpoint at which PID will be reset if temperature spikes after reaching setpoint
 pid_reset_high_temperature=8
+
+# Enable autosession data logging to file
+autosession_logging_enabled=false
+
+# Default autosession profile to load (leave empty or omit to use current_autosession_profile.txt)
+# default_autosession_profile=
+
+# Autosession log buffer flush threshold (number of lines before flushing to file)
+# autosession_log_buffer_flush_threshold=20

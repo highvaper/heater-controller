@@ -1,3 +1,15 @@
 #Test autosession 
 temperature_profile=0:100,30:100,65:150,90:200,110:200,300:150,320:100,500:10
 time_adjustment_step=60
+
+
+
+
+#This example:
+#- Starts at 100°C for the first 30 seconds
+#- Ramps to 150°C between 65-90 seconds
+#- Maintains 200°C from 90-110 seconds
+#- Cools down gradually to 100°C at 320 seconds
+#- Finishes cooling to 10°C by 500 seconds (full profile duration)
+#- Allows time adjustments in 60-second increments
+

@@ -97,3 +97,18 @@ display_contrast=255
 
 # Rotate display: boolean (true or false)
 display_rotate=true
+
+# ===== AUTOSESSION =====
+# Enable autosession data logging: boolean (true or false)
+# When enabled, autosession data will be logged to a timestamped file
+autosession_logging_enabled=true
+
+# Default autosession profile to load when this profile is loaded: string
+# Specify the profile name without the .txt extension
+# If not set or empty, falls back to loading from current_autosession_profile.txt
+default_autosession_profile=quicktest
+
+# Autosession log buffer flush threshold: int (1-200)
+# Number of lines to buffer before flushing to file. Higher values reduce I/O but use more memory.
+# Default is 20 lines
+autosession_log_buffer_flush_threshold=50

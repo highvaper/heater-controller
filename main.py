@@ -21,11 +21,10 @@ from menusystem import MenuSystem
 
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
-from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles
+from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles, create_autosession_log_file, log_autosession_data, flush_autosession_log
 
 
 from shared_state import SharedState
-
 
 
 #Need to get input voltage measured so we can possibly set an upper limit 
@@ -276,14 +275,23 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     else:
         heater.off()  #Maybe we call this no matter what just in case?
     
- #   t = ','.join(map(str, [pid._last_time, shared_state.heater_temperature, thermocouple.raw_temp, pid.setpoint, power, heater.is_on(), pid.components]))
- 
- # possibly log data for later analysis when in autosession mode add option to autoprofile config
- #   elapsed_s = (utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time) / 1000.0) if shared_state.get_mode() == "autosession" else 0.0
- #   t = ','.join(map(str, ["{:.1f}".format(elapsed_s), int(shared_state.heater_temperature), int(shared_state.temperature_setpoint), int(power)]))
- #   print(t)
-
-
+    # Log autosession data if active and logging is enabled
+    if shared_state.autosession_logging_enabled and shared_state.get_mode() == "autosession" and shared_state.autosession_profile:
+        elapsed_ms = utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time)
+        elapsed_ms = max(0, elapsed_ms)
+        
+        # Log the data with buffering
+        shared_state.autosession_log_buffer, shared_state.autosession_log_file = log_autosession_data(
+            shared_state.autosession_log_file,
+            shared_state.autosession_log_buffer,
+            elapsed_ms,
+            shared_state.heater_temperature,
+            shared_state.temperature_setpoint,
+            shared_state.input_volts,
+            heater.get_power(),
+            shared_state.watts,
+            shared_state.autosession_log_buffer_flush_threshold
+        )
 
 
 
@@ -382,17 +390,24 @@ except OSError:
 
 
 # Load saved autosession profile if it exists
-try:
-    with open('/current_autosession_profile.txt', 'r') as f:
-        autosession_profile_name = f.readline().strip()
-    if autosession_profile_name:
-        print(f"Loading autosession profile: {autosession_profile_name}")
-        success, message = apply_and_save_autosession_profile(autosession_profile_name, shared_state)
-        print(message)
-    else:
-        print("No autosession profile name found in /current_autosession_profile.txt")
-except OSError:
-    print("No /current_autosession_profile.txt found, skipping autosession profile load")
+# First check if the loaded profile has a default_autosession_profile
+if shared_state.default_autosession_profile:
+    print(f"Loading default autosession profile from profile: {shared_state.default_autosession_profile}")
+    success, message = apply_and_save_autosession_profile(shared_state.default_autosession_profile, shared_state)
+    print(message)
+else:
+    # Fall back to current_autosession_profile.txt if no default in profile
+    try:
+        with open('/current_autosession_profile.txt', 'r') as f:
+            autosession_profile_name = f.readline().strip()
+        if autosession_profile_name:
+            print(f"Loading autosession profile: {autosession_profile_name}")
+            success, message = apply_and_save_autosession_profile(autosession_profile_name, shared_state)
+            print(message)
+        else:
+            print("No autosession profile name found in /current_autosession_profile.txt")
+    except OSError:
+        print("No /current_autosession_profile.txt found, skipping autosession profile load")
 
 #config = load_config(display)  # need to get config before displaymanager setup perhaps? so if error still need to show user
 #shared_state = SharedState(config)
@@ -691,6 +706,29 @@ async def async_main():
         else:
             led_red_pin.off()
 
+        # Handle autosession logging start/stop
+        if shared_state.autosession_logging_enabled:
+            if shared_state.get_mode() == "autosession":
+                # Start logging if not already active
+                if not shared_state.autosession_logging_active:
+                    shared_state.autosession_logging_active = True
+                    shared_state.autosession_log_file, _ = create_autosession_log_file(shared_state.profile, shared_state.autosession_profile_name)
+                    shared_state.autosession_log_buffer = []
+            else:
+                # Stop logging if it was active
+                if shared_state.autosession_logging_active:
+                    shared_state.autosession_logging_active = False
+                    flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
+                    shared_state.autosession_log_file = None
+                    shared_state.autosession_log_buffer = []
+        else:
+            # If logging is disabled, ensure we stop any active logging
+            if shared_state.autosession_logging_active:
+                shared_state.autosession_logging_active = False
+                flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
+                shared_state.autosession_log_file = None
+                shared_state.autosession_log_buffer = []
+
 
         if shared_state.get_mode() == "Session":
             if (shared_state.session_timeout - shared_state.get_session_mode_duration()) > 50000 and (shared_state.session_timeout - shared_state.get_session_mode_duration()) < 60000:
@@ -705,20 +743,22 @@ async def async_main():
                         buzzer_play_tone(buzzer, 1500, 350)
                         if shared_state.session_reset_pid_when_near_setpoint:
                             shared_state.pid.reset()
+                    # Prevent overshoot by resetting PID if integral is too high while still far from setpoint
+                    #elif shared_state.heater_temperature >= (shared_state.temperature_setpoint - 10) and shared_state.pid.components[1] > 10:
+                    #    shared_state.pid.reset()
                 else:
                     #Need to make '15' in shared state so can be set via profile
                     #If reached setpoint and then temperature drops dramatically Integral can increase to much 
                     #need to catch runaway temp here after we have already reached setpointand reset pid stats 
                     if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
                         shared_state.pid.reset()
-            elif shared_state.get_mode() == "autosession":
-                #need to reset pid if big temp change from setpoint too
-                if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
-                    shared_state.pid.reset()    
-                #need to do something like we do for session when first approaching setpoint
-                #but we need to be able to reset it each time we approach setpoint from below a certain value and perhaps apply to normal session as well
-                #elif shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
-               #     shared_state.pid.reset()  
+        elif shared_state.get_mode() == "autosession":
+            #need to reset pid if big temp change from setpoint too
+            if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
+                shared_state.pid.reset()
+            # Prevent overshoot by resetting PID if integral is too high while still far from setpoint
+            elif shared_state.heater_temperature >= (shared_state.temperature_setpoint - 10) and shared_state.pid.components[1] > 10:
+                shared_state.pid.reset()
 
         if enable_watchdog:
             try:
