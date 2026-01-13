@@ -156,6 +156,8 @@ class SharedState:
         self.autosession_profile_load_pending = False  # Flag when user clicks to load autosession profile
         self.autosession_profile = None  # Loaded AutoSessionTemperatureProfile object
         self.autosession_profile_name = None  # Name of loaded autosession profile
+        self.autosession_active = False  # True when autosession is currently running
+        self.autosession_start_time = 0  # Timestamp when autosession started
         
         self.session_start_time = 0
         self.session_setpoint_reached = False
@@ -211,8 +213,11 @@ class SharedState:
         elif new_mode == "Session":
             self.session_start_time = utime.ticks_ms()
             self._mode = "Session"
+        elif new_mode == "autosession":
+            self.autosession_start_time = utime.ticks_ms()
+            self._mode = "autosession"
         else:
-            raise ValueError("Invalid mode. Must be 'Off', 'Session' or 'Manual'")
+            raise ValueError("Invalid mode. Must be 'Off', 'Session', 'Manual', or 'autosession'")
         if new_mode == "Off":
             self.led_blue_pin.off() # In case session manually ended when light on
             self.led_green_pin.off()

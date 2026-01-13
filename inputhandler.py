@@ -31,6 +31,9 @@ class InputHandler:
         self.middle_button = Pin(middle_button_pin, Pin.IN, Pin.PULL_UP)
         self.middle_button_pressed = False
         self.middle_button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.middle_button_state_changed)
+        self.middle_button_click_counter = 0
+        self.middle_button_last_press_time = 0
+        self.middle_button_click_check_timer = CustomTimer(period=self.shared_state.click_check_timeout, mode=Timer.ONE_SHOT, callback=self.check_middle_button_click_count)
         
         print("InputHandler initialised.")
 
@@ -236,13 +239,20 @@ class InputHandler:
                 
         elif self.click_counter == 3:
             #print('Triple click detected')
+            # Allow menu and navigation even when autosession active, but prevent starting a new session
             if not self.shared_state.in_menu and not self.rotary_used:
-                if self.shared_state.get_mode() == "Off" :
-                    #print("Switching to Session mode")
-                    self.shared_state.set_mode("Session") 
-                elif self.shared_state.get_mode() == "Session":
-                    self.shared_state.set_mode("Off")
-                    #print("Stopped Session mode")
+                if self.shared_state.get_mode() != "autosession":  # Only allow Session start if autosession not active
+                    if self.shared_state.get_mode() == "Off" :
+                        #print("Switching to Session mode")
+                        self.shared_state.set_mode("Session") 
+                    elif self.shared_state.get_mode() == "Session":
+                        self.shared_state.set_mode("Off")
+                        #print("Stopped Session mode")
+                else:
+                    # Autosession is active, allow menu and navigation
+                    if self.shared_state.get_mode() == "Session":
+                        self.shared_state.set_mode("Off")
+                        #print("Stopped Session mode")
                     
         elif self.click_counter == 4:
             #print('Quadruple click detected')
@@ -268,6 +278,27 @@ class InputHandler:
         else:
             self.rotary_used = False # Reset if rotary use between presses
             #print("Timer finished: Button released")
+ 
+    def check_middle_button_click_count(self, timer):
+        """Handle middle button click detection for temp_max_watts and autosession."""
+        if self.middle_button_click_counter == 1:
+            # Single-click: Show temp_max_watts screen
+            if not self.shared_state.in_menu and not self.rotary_used:
+                self.shared_state.middle_button_pressed = True
+        
+        elif self.middle_button_click_counter == 3:
+            # Triple-click detected: activate/deactivate autosession
+            if not self.shared_state.in_menu and not self.rotary_used:
+                if self.shared_state.autosession_profile and self.shared_state.get_mode() != "autosession":
+                    # Activate autosession
+                    self.shared_state.set_mode("autosession")
+                elif self.shared_state.get_mode() == "autosession":
+                    # Deactivate autosession
+                    self.shared_state.set_mode("Off")
+        
+        self.middle_button_click_counter = 0  # Reset the click counter
+        if self.middle_button_click_check_timer.is_timer_running():
+            self.middle_button_click_check_timer.stop()
  
     def switch_control_button_state_changed(self, pin):
         if pin.value() == 0: # Button is pressed
@@ -308,7 +339,21 @@ class InputHandler:
         if pin.value() == 0: # Button is pressed
             if not self.middle_button_pressed:
                 self.middle_button_pressed = True
-                self.shared_state.middle_button_pressed = True
+                
+                # Track clicks for click detection
+                current_time = utime.ticks_ms()
+                time_since_last_press = utime.ticks_diff(current_time, self.middle_button_last_press_time)
+                
+                if time_since_last_press < self.shared_state.click_check_timeout:
+                    self.middle_button_click_counter += 1
+                else:
+                    self.middle_button_click_counter = 1  # Reset the counter if the time since last press is more than timeout
+                    
+                self.middle_button_last_press_time = current_time  # Update the last button press time
+
+                if not self.middle_button_click_check_timer.is_timer_running():
+                    self.middle_button_click_check_timer.start()
         else: # Button is released
             self.middle_button_pressed = False
+
 

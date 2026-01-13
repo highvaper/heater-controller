@@ -72,7 +72,7 @@ class AutoSessionTemperatureProfile:
                 
                 fraction = (elapsed_ms - time1) / (time2 - time1)
                 interpolated = temp1 + (temp2 - temp1) * fraction
-                print(f"DEBUG: Interpolating - elapsed={elapsed_ms}, between {time1}ms({temp1}C) and {time2}ms({temp2}C), fraction={fraction}, result={interpolated}C")
+                #print(f"DEBUG: Interpolating - elapsed={elapsed_ms}, between {time1}ms({temp1}C) and {time2}ms({temp2}C), fraction={fraction}, result={interpolated}C")
                 return interpolated
         
         # Shouldn't reach here if logic is correct

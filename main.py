@@ -176,7 +176,23 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         shared_state.watt_min_time = min(shared_state.watt_readings.keys())
         shared_state.watt_max_time = max(shared_state.watt_readings.keys())
 
-    if shared_state.control == 'temperature_pid': 
+    # Check if autosession is active and update setpoint if needed
+    if shared_state.get_mode() == "autosession" and shared_state.autosession_profile:
+        # Calculate actual elapsed time since autosession start
+        elapsed_ms = utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time)
+        
+        profile_setpoint = shared_state.autosession_profile.get_setpoint_at_elapsed_time(elapsed_ms)
+        
+        if profile_setpoint is not None:
+            # Profile is still active, update setpoint
+            profile_setpoint = profile_setpoint
+            shared_state.temperature_setpoint = profile_setpoint
+        else:
+            # Profile has finished
+            # End the session when autosession profile completes
+            shared_state.set_mode("Off")
+
+    if shared_state.control == 'temperature_pid' or shared_state.control == 'autosession': 
         power = shared_state.pid(shared_state.heater_temperature)  # Update pid even if heater is off
     elif shared_state.control == 'duty_cycle':
         power = shared_state.set_duty_cycle  # Use duty cycle directly (0-100%)
@@ -259,7 +275,9 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         heater.off()  #Maybe we call this no matter what just in case?
     
  #   t = ','.join(map(str, [pid._last_time, shared_state.heater_temperature, thermocouple.raw_temp, pid.setpoint, power, heater.is_on(), pid.components]))
- #   print(t)
+    elapsed_s = (utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time) / 1000.0) if shared_state.get_mode() == "autosession" else 0.0
+    t = ','.join(map(str, ["{:.1f}".format(elapsed_s), int(shared_state.heater_temperature), int(shared_state.temperature_setpoint), int(power)]))
+    print(t)
 
 
 
@@ -686,6 +704,10 @@ async def async_main():
                     #need to catch runaway temp here after we have already reached setpointand reset pid stats 
                     if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
                         shared_state.pid.reset()
+            elif shared_state.get_mode() == "autosession":
+                #need to reset pid if big temp change from setpoint too
+                if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
+                    shared_state.pid.reset()    
 
         if enable_watchdog:
             try:
