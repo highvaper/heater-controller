@@ -31,6 +31,9 @@ class InputHandler:
         self.middle_button = Pin(middle_button_pin, Pin.IN, Pin.PULL_UP)
         self.middle_button_pressed = False
         self.middle_button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.middle_button_state_changed)
+        self.middle_button_click_counter = 0
+        self.middle_button_last_press_time = 0
+        self.middle_button_click_check_timer = CustomTimer(period=self.shared_state.click_check_timeout, mode=Timer.ONE_SHOT, callback=self.check_middle_button_click_count)
         
         print("InputHandler initialised.")
 
@@ -43,6 +46,24 @@ class InputHandler:
             self.rotary.set(range_mode=RotaryIRQ.RANGE_WRAP)
             self.shared_state.rotary_last_mode = "menu"
             print("setup rotarty menu" + str(self.rotary.value()))
+        elif not self.shared_state.in_menu and self.shared_state.rotary_last_mode != "autosession" and self.shared_state.get_mode() == "autosession":
+            # Setup rotary for autosession time adjustment - PRIORITY over setpoint when autosession is running
+            # Rotary position represents current position in the profile (0 = start, max = end)
+            if self.shared_state.autosession_profile:
+                profile_duration_ms = self.shared_state.autosession_profile.get_duration_ms()
+                # Use configurable autosession_time_adjustment_step from profile config (in seconds, convert to ms)
+                step_ms = self.shared_state.autosession_time_adjustment_step * 1000
+                max_steps = int(profile_duration_ms / step_ms)
+            else:
+                max_steps = 600  # Fallback if no profile
+            
+            self.rotary.set(value=0)
+            self.previous_rotary_value = 0
+            self.rotary.set(min_val=0)           # Start of profile
+            self.rotary.set(max_val=max_steps)   # End of profile
+            self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
+            self.shared_state.rotary_last_mode = "autosession"
+            print(f"setup rotary autosession time adjustment: 0 to {max_steps} steps (step_size={self.shared_state.autosession_time_adjustment_step}s)")
         elif self.shared_state.rotary_last_mode != "Profiles" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Profiles":
             # Handle profile selection like show_settings
             self.rotary.set(value=self.shared_state.profile_selection_index)
@@ -53,6 +74,16 @@ class InputHandler:
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Profiles" 
             print(f"setup rotary profiles: index={self.rotary.value()}, max={max_profiles}")
+        elif self.shared_state.rotary_last_mode != "Autosession Profiles" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Autosession Profiles":
+            # Handle autosession profile selection
+            self.rotary.set(value=self.shared_state.autosession_profile_selection_index)
+            self.previous_rotary_value = self.shared_state.autosession_profile_selection_index
+            self.rotary.set(min_val=0)
+            max_autosession = len(self.shared_state.autosession_profile_list) - 1 if self.shared_state.autosession_profile_list else 0
+            self.rotary.set(max_val=max_autosession)
+            self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
+            self.shared_state.rotary_last_mode = "Autosession Profiles"
+            print(f"setup rotary autosession profiles: index={self.rotary.value()}, max={max_autosession}")
         elif self.shared_state.rotary_last_mode != "Display Contrast" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Display Contrast":
             self.rotary.set(value=self.shared_state.display_contrast)
             self.previous_rotary_value = self.shared_state.display_contrast
@@ -109,6 +140,19 @@ class InputHandler:
     def rotary_callback(self):
         current_menu_option = self.shared_state.menu_options[self.shared_state.current_menu_position] if self.shared_state.current_menu_position < len(self.shared_state.menu_options) else None
     
+        # PRIORITY: Check for autosession mode FIRST before anything else
+        if not self.shared_state.in_menu and self.shared_state.get_mode() == "autosession":
+            # Handle autosession time adjustment - this takes precedence over all other modes
+            # Adjust the start time directly so all elapsed calculations automatically use the adjusted time
+            current_value = self.rotary.value()
+            delta = current_value - self.previous_rotary_value
+            step_ms = self.shared_state.autosession_time_adjustment_step * 1000  # Convert configured step (seconds) to milliseconds
+            time_adjustment = delta * step_ms
+            self.shared_state.autosession_start_time -= time_adjustment  # Move start time backward to advance profile, forward to rewind
+            print(f"Autosession rotary: current={current_value}, prev={self.previous_rotary_value}, delta={delta}, time_adj={time_adjustment}ms, new_start_time={self.shared_state.autosession_start_time}")
+            self.previous_rotary_value = current_value
+            return  # Exit early - don't process as normal setpoint
+        
         if self.shared_state.in_menu:
             direction = 'up' if self.rotary.value() > self.previous_rotary_value else 'down'
             self.shared_state.rotary_direction = direction
@@ -118,6 +162,9 @@ class InputHandler:
             if self.shared_state.rotary_last_mode == "Profiles":
                 # Handle profile selection
                 self.shared_state.profile_selection_index = self.rotary.value()
+            elif self.shared_state.rotary_last_mode == "Autosession Profiles":
+                # Handle autosession profile selection
+                self.shared_state.autosession_profile_selection_index = self.rotary.value()
             elif self.shared_state.rotary_last_mode == "Display Contrast":
                 # Update display contrast
                 self.shared_state.display_contrast = self.rotary.value()
@@ -206,6 +253,8 @@ class InputHandler:
                 # Handle profile selection click - just set flag, let main loop handle display
                 if self.shared_state.rotary_last_mode == "Profiles":
                     self.shared_state.profile_load_pending = True
+                elif self.shared_state.rotary_last_mode == "Autosession Profiles":
+                    self.shared_state.autosession_profile_load_pending = True
                 # Handle session extend in last minute
                 elif self.shared_state.get_mode() == "Session":
                     if (self.shared_state.session_timeout - self.shared_state.get_session_mode_duration()) < 60000:
@@ -221,13 +270,20 @@ class InputHandler:
                 
         elif self.click_counter == 3:
             #print('Triple click detected')
+            # Allow menu and navigation even when autosession active, but prevent starting a new session
             if not self.shared_state.in_menu and not self.rotary_used:
-                if self.shared_state.get_mode() == "Off" :
-                    #print("Switching to Session mode")
-                    self.shared_state.set_mode("Session") 
-                elif self.shared_state.get_mode() == "Session":
-                    self.shared_state.set_mode("Off")
-                    #print("Stopped Session mode")
+                if self.shared_state.get_mode() != "autosession":  # Only allow Session start if autosession not active
+                    if self.shared_state.get_mode() == "Off" :
+                        #print("Switching to Session mode")
+                        self.shared_state.set_mode("Session") 
+                    elif self.shared_state.get_mode() == "Session":
+                        self.shared_state.set_mode("Off")
+                        #print("Stopped Session mode")
+                else:
+                    # Autosession is active, allow menu and navigation
+                    if self.shared_state.get_mode() == "Session":
+                        self.shared_state.set_mode("Off")
+                        #print("Stopped Session mode")
                     
         elif self.click_counter == 4:
             #print('Quadruple click detected')
@@ -253,6 +309,27 @@ class InputHandler:
         else:
             self.rotary_used = False # Reset if rotary use between presses
             #print("Timer finished: Button released")
+ 
+    def check_middle_button_click_count(self, timer):
+        """Handle middle button click detection for temp_max_watts and autosession."""
+        if self.middle_button_click_counter == 1:
+            # Single-click: Show temp_max_watts screen
+            if not self.shared_state.in_menu and not self.rotary_used:
+                self.shared_state.middle_button_pressed = True
+        
+        elif self.middle_button_click_counter == 3:
+            # Triple-click detected: activate/deactivate autosession
+            if not self.shared_state.in_menu and not self.rotary_used:
+                if self.shared_state.autosession_profile and self.shared_state.get_mode() != "autosession":
+                    # Activate autosession
+                    self.shared_state.set_mode("autosession")
+                elif self.shared_state.get_mode() == "autosession":
+                    # Deactivate autosession
+                    self.shared_state.set_mode("Off")
+        
+        self.middle_button_click_counter = 0  # Reset the click counter
+        if self.middle_button_click_check_timer.is_timer_running():
+            self.middle_button_click_check_timer.stop()
  
     def switch_control_button_state_changed(self, pin):
         if pin.value() == 0: # Button is pressed
@@ -293,7 +370,21 @@ class InputHandler:
         if pin.value() == 0: # Button is pressed
             if not self.middle_button_pressed:
                 self.middle_button_pressed = True
-                self.shared_state.middle_button_pressed = True
+                
+                # Track clicks for click detection
+                current_time = utime.ticks_ms()
+                time_since_last_press = utime.ticks_diff(current_time, self.middle_button_last_press_time)
+                
+                if time_since_last_press < self.shared_state.click_check_timeout:
+                    self.middle_button_click_counter += 1
+                else:
+                    self.middle_button_click_counter = 1  # Reset the counter if the time since last press is more than timeout
+                    
+                self.middle_button_last_press_time = current_time  # Update the last button press time
+
+                if not self.middle_button_click_check_timer.is_timer_running():
+                    self.middle_button_click_check_timer.start()
         else: # Button is released
             self.middle_button_pressed = False
+
 

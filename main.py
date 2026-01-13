@@ -21,7 +21,7 @@ from menusystem import MenuSystem
 
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
-from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile
+from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles
 
 
 from shared_state import SharedState
@@ -176,7 +176,25 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         shared_state.watt_min_time = min(shared_state.watt_readings.keys())
         shared_state.watt_max_time = max(shared_state.watt_readings.keys())
 
-    if shared_state.control == 'temperature_pid': 
+    # Check if autosession is active and update setpoint if needed
+    if shared_state.get_mode() == "autosession" and shared_state.autosession_profile:
+        # Calculate actual elapsed time since autosession start (adjusted by rotary dial)
+        elapsed_ms = utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time)
+        # Clamp elapsed time to valid range (0 to profile duration)
+        elapsed_ms = max(0, elapsed_ms)
+        
+        profile_setpoint = shared_state.autosession_profile.get_setpoint_at_elapsed_time(elapsed_ms)
+        
+        if profile_setpoint is not None:
+            # Profile is still active, update setpoint
+            profile_setpoint = profile_setpoint
+            shared_state.temperature_setpoint = profile_setpoint
+        else:
+            # Profile has finished
+            # End the session when autosession profile completes
+            shared_state.set_mode("Off")
+
+    if shared_state.control == 'temperature_pid' or shared_state.control == 'autosession':
         power = shared_state.pid(shared_state.heater_temperature)  # Update pid even if heater is off
     elif shared_state.control == 'duty_cycle':
         power = shared_state.set_duty_cycle  # Use duty cycle directly (0-100%)
@@ -259,6 +277,10 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         heater.off()  #Maybe we call this no matter what just in case?
     
  #   t = ','.join(map(str, [pid._last_time, shared_state.heater_temperature, thermocouple.raw_temp, pid.setpoint, power, heater.is_on(), pid.components]))
+ 
+ # possibly log data for later analysis when in autosession mode add option to autoprofile config
+ #   elapsed_s = (utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time) / 1000.0) if shared_state.get_mode() == "autosession" else 0.0
+ #   t = ','.join(map(str, ["{:.1f}".format(elapsed_s), int(shared_state.heater_temperature), int(shared_state.temperature_setpoint), int(power)]))
  #   print(t)
 
 
@@ -331,8 +353,17 @@ print("Display initialised.")
 shared_state = SharedState(led_red_pin=led_red_pin, led_green_pin=led_green_pin, led_blue_pin=led_blue_pin)
 
 # Load profile list at startup (like show_settings loads all settings once)
+
+
+
+# Load normal profiles list
 shared_state.profile_list = list_profiles()
 shared_state.profile_selection_index = 0
+
+# Load autosession profiles list (do not load profile itself)
+shared_state.autosession_profile_list = list_autosession_profiles()
+shared_state.autosession_profile_selection_index = 0
+
 
 # Load saved default profile if it exists
 try:
@@ -348,9 +379,26 @@ try:
 except OSError:
     print("No /current_profile.txt found, using default settings")
 
+
+
+# Load saved autosession profile if it exists
+try:
+    with open('/current_autosession_profile.txt', 'r') as f:
+        autosession_profile_name = f.readline().strip()
+    if autosession_profile_name:
+        print(f"Loading autosession profile: {autosession_profile_name}")
+        success, message = apply_and_save_autosession_profile(autosession_profile_name, shared_state)
+        print(message)
+    else:
+        print("No autosession profile name found in /current_autosession_profile.txt")
+except OSError:
+    print("No /current_autosession_profile.txt found, skipping autosession profile load")
+
 #config = load_config(display)  # need to get config before displaymanager setup perhaps? so if error still need to show user
 #shared_state = SharedState(config)
  
+
+
 
 # DisplayManager
 try:
@@ -506,6 +554,10 @@ print("Timers initialised.")
 ############### 
 
 
+# After heater is initialized and before entering the event loop, start the home screen
+display_manager.start_home(heater, loop=asyncio.get_event_loop(), interval_ms=200)
+
+
 
 # Lets enable and see if it helps when heater on and we crash
 # So far from simulated tests this seems to work and heater pin is reset
@@ -549,11 +601,7 @@ async def async_main():
             except Exception:
                 pass
 
-    # Show startup screen asynchronously if possible
-    try:
-        display_manager.show_startup_screen()
-    except Exception:
-        pass
+    display_manager.show_startup_screen()
 
     while True:
         # Check and display any active errors
@@ -584,7 +632,10 @@ async def async_main():
         elif not shared_state.in_menu:
             if shared_state.current_menu_position <= 1:
                 # ensure rotary values set once (but not if temp_max_watts screen is active)
-                if shared_state.rotary_last_mode != "setpoint" and not shared_state.temp_max_watts_screen_active:
+                # Also ensure rotary is reconfigured when autosession starts/stops
+                # Don't reconfigure if we're already in autosession mode with rotary set to autosession
+                if (shared_state.rotary_last_mode != "setpoint" and shared_state.rotary_last_mode != "autosession" and not shared_state.temp_max_watts_screen_active) or \
+                   (shared_state.get_mode() == "autosession" and shared_state.rotary_last_mode != "autosession"):
                     input_handler.setup_rotary_values()
                 shared_state.current_menu_position = 1
                 # start async home-screen updater (no-op if already running)
@@ -596,10 +647,18 @@ async def async_main():
                 # Check if user clicked on profiles screen to load a profile
                 if shared_state.rotary_last_mode == "Profiles" and shared_state.profile_load_pending:
                     if shared_state.profile_list:
-                        profile_name = shared_state.profile_list[shared_state.profile_selection_index]
-                        success, message = apply_and_save_profile(profile_name, shared_state)
+                        success, message = apply_and_save_profile(shared_state.profile_list[shared_state.profile_selection_index], shared_state)
                         #display_manager.display_error(message, 2, False)
                     shared_state.profile_load_pending = False
+                    # Return to home screen
+                    shared_state.current_menu_position = 1
+                    shared_state.rotary_last_mode = None
+                # Check if user clicked on autosession profiles screen to load an autosession profile
+                elif shared_state.rotary_last_mode == "Autosession Profiles" and shared_state.autosession_profile_load_pending:
+                    if shared_state.autosession_profile_list:
+                        success, message = apply_and_save_autosession_profile(shared_state.autosession_profile_list[shared_state.autosession_profile_selection_index], shared_state)
+                        #display_manager.display_error(message, 2, False)
+                    shared_state.autosession_profile_load_pending = False
                     # Return to home screen
                     shared_state.current_menu_position = 1
                     shared_state.rotary_last_mode = None
@@ -652,6 +711,14 @@ async def async_main():
                     #need to catch runaway temp here after we have already reached setpointand reset pid stats 
                     if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
                         shared_state.pid.reset()
+            elif shared_state.get_mode() == "autosession":
+                #need to reset pid if big temp change from setpoint too
+                if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
+                    shared_state.pid.reset()    
+                #need to do something like we do for session when first approaching setpoint
+                #but we need to be able to reset it each time we approach setpoint from below a certain value and perhaps apply to normal session as well
+                #elif shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
+               #     shared_state.pid.reset()  
 
         if enable_watchdog:
             try:

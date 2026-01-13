@@ -50,7 +50,8 @@ class SharedState:
         # PID Tuning - can be loaded from profile
         self.pid_temperature_tunings = (2.3, 0.03, 0)  # (P, I, D) - example for 2x lipo batteries
         
-        # Track which profile is currently loaded
+        # Track which profile is currently loaded 
+        #need to rename to profile_name 
         self.profile = "default"  # Will be updated when a profile is loaded
        
         self.session_timeout = 7 * 60 * 1000       # length of time for a session before auto off (7 mins)
@@ -108,25 +109,29 @@ class SharedState:
         #Maybe make below options have more info eg:
         # setup_rotary_values in inputhandler 
         # options screen timeout to return to home (or none for graphs etc)
-        self.menu_options = [f"{self.profile}",
-                             "Home Screen",
-                             "Profiles",
-                             "Graph Setpoint",
-                             "Graph Line",
-                             "Graph Bar",
-                             "Temp Watts Line",
-                             "Watts Line",
-                             "Show Settings",
-                             "Display Contrast"
-                            ]
-                            # Battery/power info screen  - can we get volts & amps? and move to where pid is on home? + level 
-                            # Heater / coil info screen - coil length? coil ohm? (user may need to provide ohm reading at 25C)  
-                            # Get resitance ? - its possible for the pico to work out the element reistance and approximate wattsage 
-                            # to help user work out a limit - would need to be super careful to only happen when element has no power 
-                            # Maybe use pwm heater pins and reconfigure them for to get the resitnace and need a reboot once done?
-                            # Get varuous settings for elements in config file as may need to limit highest temp coil can get not to burn insulation PTFE 
-                            # ie despite pid/thermocouple - so tcr? or just limit wattage on known values for wire type/length/ohms so it doesnt get too hot 
- 
+        # Menu options: show current profile and autosession profile if set
+        self.menu_options = [
+            f"{self.profile}",
+            "Home Screen",
+            "Profiles",
+            "Autosession Profiles",
+            "Graph Setpoint",
+            "Graph Line",
+            "Graph Bar",
+            "Temp Watts Line",
+            "Watts Line",
+            "Show Settings",
+            "Display Contrast"
+        ]
+   
+        # Battery/power info screen  - can we get volts & amps? and move to where pid is on home? + level 
+        # Heater / coil info screen - coil length? coil ohm? (user may need to provide ohm reading at 25C)  
+        # Get resitance ? - its possible for the pico to work out the element reistance and approximate wattsage 
+        # to help user work out a limit - would need to be super careful to only happen when element has no power 
+        # Maybe use pwm heater pins and reconfigure them for to get the resitnace and need a reboot once done?
+        # Get varuous settings for elements in config file as may need to limit highest temp coil can get not to burn insulation PTFE 
+        # ie despite pid/thermocouple - so tcr? or just limit wattage on known values for wire type/length/ohms so it doesnt get too hot 
+
         self.in_menu = False   
         self.current_menu_position = 0 
         self.menu_selection_pending = False 
@@ -140,9 +145,21 @@ class SharedState:
 
         self.show_settings_line = 0  # for show settings in display to know what setting to show
         
+
         self.profile_list = []  # List of available profiles
         self.profile_selection_index = 0  # Current profile selection in list
         self.profile_load_pending = False  # Flag when user clicks to load profile
+
+        # AUTOSESSION PROFILE SUPPORT
+        self.autosession_profile_list = []  # List of available autosession profiles
+        self.autosession_profile_selection_index = 0  # Current autosession profile selection in list
+        self.autosession_profile_load_pending = False  # Flag when user clicks to load autosession profile
+        self.autosession_profile = None  # Loaded AutoSessionTemperatureProfile object
+        self.autosession_profile_name = None  # Name of loaded autosession profile
+        self.autosession_active = False  # True when autosession is currently running
+        self.autosession_start_time = 0  # Timestamp when autosession started
+        self.autosession_time_offset_ms = 0  # Rotary dial offset for autosession time in milliseconds (positive = advance, negative = rewind)
+        self.autosession_time_adjustment_step = 10  # Rotary dial step size in seconds for autosession time adjustment (loaded from profile config)
         
         self.session_start_time = 0
         self.session_setpoint_reached = False
@@ -198,8 +215,11 @@ class SharedState:
         elif new_mode == "Session":
             self.session_start_time = utime.ticks_ms()
             self._mode = "Session"
+        elif new_mode == "autosession":
+            self.autosession_start_time = utime.ticks_ms()
+            self._mode = "autosession"
         else:
-            raise ValueError("Invalid mode. Must be 'Off', 'Session' or 'Manual'")
+            raise ValueError("Invalid mode. Must be 'Off', 'Session', 'Manual', or 'autosession'")
         if new_mode == "Off":
             self.led_blue_pin.off() # In case session manually ended when light on
             self.led_green_pin.off()
@@ -327,7 +347,9 @@ class SharedState:
         if self.menu_options:
             self.menu_options[0] = f"{self.profile}"
         print(f"Profile set to: {self.profile}")
-    
+
+
+        
     def initialize_defaults(self):
         """Return a dictionary with all hardcoded default configuration values.
         Used when loading profiles to ensure they start from a known baseline."""

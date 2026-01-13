@@ -73,13 +73,14 @@ class MenuSystem:
         selected_option = self.shared_state.menu_options[self.shared_state.current_menu_position]
         selected_option = selected_option.replace(' ', '_')
         selected_option = selected_option.lower()
-        
+
         if selected_option == "home_screen":
             self.exit_menu()
             return
-        
+
+
         self.display_manager.display_screen(selected_option)
-        self.exit_menu() 
+        self.exit_menu()
 
 
     def display_menu(self):

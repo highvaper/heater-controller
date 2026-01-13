@@ -1,3 +1,4 @@
+
 import utime
 #import sys ? do we need this?
 
@@ -6,6 +7,8 @@ from machine import Pin, I2C
 from ssd1306 import SSD1306_I2C
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 from machine import ADC
+
+from autosession import AutoSessionTemperatureProfile
 
 def load_profile(profile_name, shared_state):
 
@@ -155,7 +158,77 @@ def apply_and_save_profile(profile_name, shared_state):
         return False, f"Error loading profile"
 
 
+# AUTOSESSION PROFILE SUPPORT
+def load_autosession_profile(profile_name):
+    try:
+        with open('/profiles_autosession/' + profile_name + '.txt', 'r') as file:
+            profile_string = file.read().strip()
+            return profile_string
+    except OSError as e:
+        print(f"Warning: Could not load autosession profile '{profile_name}': {e}")
+        return None
 
+def list_autosession_profiles():
+    profiles = []
+    try:
+        import os
+        for filename in os.listdir('/profiles_autosession/'):
+            if filename.endswith('.txt'):
+                profiles.append(filename[:-4])
+        profiles.sort()
+    except Exception as e:
+        print(f"Error listing autosession profiles: {e}")
+    return profiles
+
+# Helper to load and save autosession profile, like apply_and_save_profile
+def apply_and_save_autosession_profile(profile_name, shared_state):
+    if not profile_name:
+        return False, "No autosession profile name provided"
+    try:
+        print(f"Loading autosession profile: {profile_name}")
+        profile_string = load_autosession_profile(profile_name)
+        if not profile_string:
+            return False, f"Autosession profile '{profile_name}' not found"
+        # Find the first non-comment, non-blank line starting with 'temperature_profile='
+        temp_profile_line = None
+        time_adjustment_step = 10  # Default to 10 seconds if not specified
+        
+        for line in profile_string.splitlines():
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if line.startswith('temperature_profile='):
+                temp_profile_line = line
+            elif line.startswith('time_adjustment_step='):
+                try:
+                    time_adjustment_step = int(line.split('=', 1)[1].strip())
+                except (ValueError, IndexError):
+                    print(f"Warning: Could not parse time_adjustment_step, using default 10 seconds")
+                    time_adjustment_step = 10
+        
+        if temp_profile_line:
+            profile_value = temp_profile_line.split('=', 1)[1].strip()
+        else:
+            profile_value = profile_string.strip()
+        
+        shared_state.autosession_profile = AutoSessionTemperatureProfile(profile_value)
+        shared_state.autosession_profile_name = profile_name
+        shared_state.autosession_time_adjustment_step = time_adjustment_step
+        print(f"Autosession profile set to: {profile_name}")
+        print(f"Autosession time adjustment step: {time_adjustment_step} seconds")
+        # Save as current autosession profile
+        try:
+            with open('/current_autosession_profile.txt', 'w') as f:
+                f.write(profile_name)
+            print(f"Saved current autosession profile: {profile_name}")
+        except OSError as e:
+            print(f"Warning: Could not save current autosession profile: {e}")
+            return True, f"Autosession profile loaded but not saved: {e}"
+        return True, f"Loaded autosession: {profile_name}"
+    except Exception as e:
+        print(f"Error loading autosession profile: {e}")
+        return False, f"Error loading autosession profile"
+    
 def get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager, shared_state=None):
     try:
         ADC_voltage = pi_temperature_sensor.read_u16() * (3.3 / (65536))
@@ -293,4 +366,5 @@ def buzzer_play_tone(buzzer, frequency, duration):
     #buzzer.duty_u16(32768) # 50% duty cycle
     buzzer.duty_u16(10000) # 
     utime.sleep_ms(duration)
+
     buzzer.duty_u16(0) # Stop the buzzer

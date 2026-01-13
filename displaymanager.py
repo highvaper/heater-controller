@@ -4,6 +4,7 @@ import uasyncio as asyncio
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
 class DisplayManager:
+
     
     def __init__(self, display, shared_state):
     
@@ -479,26 +480,35 @@ class DisplayManager:
 
 
         t = "M: " + shared_state.get_mode()
-        if shared_state.get_mode() == "Session":
-            t = t + " " + str(int((shared_state.session_timeout - shared_state.get_session_mode_duration())/1000)) + "s"
-
-        # Add PI temperature to menu somewhere
-        #pi_temperature = shared_state.get_pi_temperature()
-        #if shared_state.temperature_units == 'F':
-        #    t = "Mode: " + str(int(32 + (1.8 * pi_temperature))) + "F"
-        #else:
-        #    t = "Mode: " + str(int(pi_temperature)) + "C"
-        
-        self.display.text(t, 0, 16)
-        if self.shared_state.control == 'temperature_pid':
-            p, i, d = self.shared_state.pid.components
-            if d > 0:
-                t = "{:d} {:d} {:d}".format(int(p), int(i), int(d))
+        if shared_state.get_mode() == "autosession":
+            # Show Auto Session with profile name
+            if shared_state.autosession_profile_name:
+                t = "M: " + shared_state.autosession_profile_name
             else:
-                t = "{:d} {:d}".format(int(p), int(i))
-            if heater.is_on() and isinstance(heater, ElementHeater):
-                t = t + " P: " + "{:.d}".format(int(heater.get_power()))
-                
+                t = "M: Auto Session"
+        elif shared_state.get_mode() == "Session":
+            t = t + " " + str(int((shared_state.session_timeout - shared_state.get_session_mode_duration())/1000)) + "s"
+        self.display.text(t, 0, 16)
+
+        if self.shared_state.control == 'temperature_pid':
+            if shared_state.get_mode() == "autosession":
+                # When autosession is running, display elapsed and remaining time
+                elapsed_ms = utime.ticks_diff(utime.ticks_ms(), shared_state.autosession_start_time)
+                elapsed_ms = max(0, elapsed_ms)  # Clamp to 0
+                elapsed_s = int(elapsed_ms / 1000)
+                remaining_ms = shared_state.autosession_profile.get_duration_ms() - elapsed_ms
+                remaining_s = max(0, int(remaining_ms / 1000))
+                t = str(elapsed_s) + "s/" + str(remaining_s) + "s"
+            else:
+                # Normal PID stats display
+                p, i, d = self.shared_state.pid.components
+                if d > 0:
+                    t = "{:d} {:d} {:d}".format(int(p), int(i), int(d))
+                else:
+                    t = "{:d} {:d}".format(int(p), int(i))
+                if heater.is_on() and isinstance(heater, ElementHeater):
+                    t = t + " P: " + "{:.d}".format(int(heater.get_power()))
+                    
             self.display.text(t, 0, 24)
 
     def show_screen_show_settings(self):
@@ -566,8 +576,6 @@ class DisplayManager:
         
         profile_name = profile_list[idx]
         position_text = f"{idx + 1}/{len(profile_list)}"
-        #print("Profile:", profile_name, "Position:", position_text)
-        # Display profile name
         display_text = f"{profile_name}"
         
         # Show on first line
@@ -576,6 +584,25 @@ class DisplayManager:
         # Show position on second line  
         self.display.text(position_text, 0, 8, 1)
         
+        self.display.show()
+
+    def show_screen_autosession_profiles(self):
+        self.display.fill(0)
+        autosession_list = self.shared_state.autosession_profile_list
+        if not autosession_list:
+            self.display.text("No autosession", 0, 0, 1)
+            self.display.text("profiles found", 0, 8, 1)
+            self.display.show()
+            return
+        idx = self.shared_state.autosession_profile_selection_index
+        if idx >= len(autosession_list):
+            idx = len(autosession_list) - 1
+            self.shared_state.autosession_profile_selection_index = idx
+        profile_name = autosession_list[idx]
+        position_text = f"{idx + 1}/{len(autosession_list)}"
+        display_text = f"{profile_name}"
+        self.display.text(display_text, 0, 0, 1)
+        self.display.text(position_text, 0, 8, 1)
         self.display.show()
 
 
@@ -616,7 +643,7 @@ class DisplayManager:
         method = getattr(self, method_name, None)
         if method:
             # Keep graph-like and interactive screens displayed in a small async loop so they yield
-            graph_options = {'graph_bar', 'graph_line', 'graph_setpoint', 'temp_watts_line', 'watts_line', 'profiles', 'show_settings'}
+            graph_options = {'graph_bar', 'graph_line', 'graph_setpoint', 'temp_watts_line', 'watts_line', 'profiles', 'show_settings', 'autosession_profiles'}
             #if asyncio and option in graph_options:
             if option in graph_options:
                 try:
