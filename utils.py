@@ -1,7 +1,7 @@
 
 import utime
 #import sys ? do we need this?
-
+import os
 #from machine import ADC, Pin, I2C, Timer, WDT, PWM
 from machine import Pin, I2C
 from ssd1306 import SSD1306_I2C
@@ -19,7 +19,6 @@ def create_autosession_log_file(profile_name, autosession_profile_name):
     Returns (file_object, filename) or (None, None) on error.
     """
     try:
-        import os
         # Create directory if it doesn't exist
         try:
             os.mkdir('/autosession_logs')
@@ -47,7 +46,7 @@ def create_autosession_log_file(profile_name, autosession_profile_name):
         print(f"Error creating autosession log file: {e}")
         return None, None
 
-def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, temperature_setpoint, input_volts, power_percent, watts, autosession_log_buffer_flush_threshold):
+def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, temperature_setpoint, input_volts, power_percent, watts, autosession_log_buffer_flush_threshold, led_pin):
     """
     Buffer autosession data and flush when buffer reaches configured threshold.
     Returns updated buffer and file object (or None if closed).
@@ -68,11 +67,13 @@ def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, t
             log_buffer = []
             # On MicroPython, also call fsync if available for extra safety
             try:
-                import os
                 os.fsync(log_file.fileno())
             except (AttributeError, OSError):
                 pass  # fsync not available on this platform
-        
+            #flash blue led to indicate log flush
+            led_pin.on()
+            utime.sleep_ms(50)
+            led_pin.off()  
         return log_buffer, log_file
     except Exception as e:
         print(f"Error logging autosession data: {e}")
@@ -88,7 +89,6 @@ def flush_autosession_log(log_file, log_buffer):
             log_file.flush()
             # On MicroPython, also call fsync if available for extra safety
             try:
-                import os
                 os.fsync(log_file.fileno())
             except (AttributeError, OSError):
                 pass  # fsync not available on this platform
@@ -214,7 +214,6 @@ def load_profile(profile_name, shared_state):
 
 def list_profiles():
     try:
-        import os
         profiles = []
         try:
             # Try to list directory contents
@@ -277,7 +276,6 @@ def load_autosession_profile(profile_name):
 def list_autosession_profiles():
     profiles = []
     try:
-        import os
         for filename in os.listdir('/profiles_autosession/'):
             if filename.endswith('.txt'):
                 profiles.append(filename[:-4])

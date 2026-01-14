@@ -290,7 +290,8 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
             shared_state.input_volts,
             heater.get_power(),
             shared_state.watts,
-            shared_state.autosession_log_buffer_flush_threshold
+            shared_state.autosession_log_buffer_flush_threshold,
+            shared_state.led_blue_pin
         )
 
 
@@ -518,14 +519,6 @@ input_handler = InputHandler(rotary_clk_pin=hardware_pin_rotary_clk, rotary_dt_p
 menu_system = MenuSystem(display_manager, shared_state)
 
 
-# PID
-
-
-#read before trying to tune: http://brettbeauregard.com/blog/2017/06/introducing-proportional-on-measurement/
-#pid.differential_on_measurement = True   #Either this or the below not both - this is the default for PID
-#pid.proportional_on_measurement = True   #Seems to be a bit odd
-
-
 while shared_state.input_volts is False:
     shared_state.input_volts = get_input_volts(False)
     utime.sleep_ms(50)
@@ -535,47 +528,23 @@ while shared_state.input_volts is False:
 #reduce if too high to more sensible level
 
 # InductionHeater
-
 #ihTimer = Timer(-1) # need to replace with CustomTimer 
 #heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
 
 heater = HeaterFactory.create_heater('element', hardware_pin_heater)   # changing the limit will mess with PID tuning
 
-#heater = HeaterFactory.create_heater('element', hardware_pin_heater) # no limit
-#heater = HeaterFactory.create_heater('element', hardware_pin_heater, 100) # no limit
-
 
 heater.off()
 
 
+
 pidTimer = CustomTimer(371, machine.Timer.PERIODIC, timerUpdatePIDandHeater)  # need to have timer setup before calling below 
 shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
-
-
-print("Timers Initialising ...")
 # Do not start timers here; they'll be started when the asyncio loop is running
 # pidTimer.start()
 # pid.reset()
-
 piTempTimer = CustomTimer(903, machine.Timer.PERIODIC, timerSetPiTemp)
-
-
-
 print("Timers initialised.")
-
-
-
-# start up stuff done
-############### 
-
-
-# After heater is initialized and before entering the event loop, start the home screen
-display_manager.start_home(heater, loop=asyncio.get_event_loop(), interval_ms=200)
-
-
-
-# Lets enable and see if it helps when heater on and we crash
-# So far from simulated tests this seems to work and heater pin is reset
 
 #enable_watchdog = False
 if enable_watchdog: 
@@ -583,191 +552,197 @@ if enable_watchdog:
     print("Watchdog enabled")
 
 
-
-start_time = utime.ticks_ms()
-iteration_count = 0
-refresh_rate = 0
-
-# Sort of a load average 
-#start_times = [utime.ticks_ms(), utime.ticks_ms(), utime.ticks_ms()] 
-#iteration_counts = [0, 0, 0] 
-#period_durations = [1000, 10000, 30000]
-
-
 async def async_main():
     # Start periodic timers now that (optionally) the asyncio loop is running.
     try:
         pidTimer.start()
         shared_state.pid.reset()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error starting pidTimer: {e}")
     try:
         piTempTimer.start()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error starting piTempTimer: {e}")
 
     # Start display heartbeat as a background task if available
     if hasattr(display_manager, 'start_heartbeat') and asyncio:
         try:
             display_manager.start_heartbeat(loop=asyncio.get_event_loop(), interval_ms=70)
-        except Exception:
+        except Exception as e:
             try:
                 display_manager.start_heartbeat(interval_ms=70)
             except Exception:
                 pass
 
-    display_manager.show_startup_screen()
+    try:
+        display_manager.show_startup_screen()
+    except Exception as e:
+        print(f"Error showing startup screen: {e}")
+
+    await asyncio.sleep_ms(100)  # Brief pause before main loop
 
     while True:
-        # Check and display any active errors
-        if shared_state.has_error():
-            display_manager.show_error()
-        # Check if user clicked middle button to show temp_max_watts screen
-        elif shared_state.middle_button_pressed:
-            display_manager.stop_home()
-            shared_state.in_menu = False  # Make sure we exit menu mode
-            shared_state.temp_max_watts_screen_active = True
-            shared_state.temp_max_watts_start_time = utime.ticks_ms()
-            shared_state.rotary_last_mode = None  # Reset so setup_rotary_values sets it to "Temp Max Watts"
-            input_handler.setup_rotary_values()
-            display_manager.show_screen_temp_max_watts()
-            shared_state.middle_button_pressed = False
-        # Handle temp_max_watts screen display with timeout
-        elif shared_state.temp_max_watts_screen_active:
-            # Check if timeout has elapsed (2 seconds with no rotary activity)
-            elapsed = utime.ticks_diff(utime.ticks_ms(), shared_state.temp_max_watts_start_time)
-            if elapsed >= 2000:
-                # Timeout - return to home screen
-                shared_state.temp_max_watts_screen_active = False
-                shared_state.rotary_last_mode = None
-                shared_state.current_menu_position = 1
-            else:
-                # Still displaying - update the screen
-                display_manager.show_screen_temp_max_watts()
-        elif not shared_state.in_menu:
-            if shared_state.current_menu_position <= 1:
-                # ensure rotary values set once (but not if temp_max_watts screen is active)
-                # Also ensure rotary is reconfigured when autosession starts/stops
-                # Don't reconfigure if we're already in autosession mode with rotary set to autosession
-                if (shared_state.rotary_last_mode != "setpoint" and shared_state.rotary_last_mode != "autosession" and not shared_state.temp_max_watts_screen_active) or \
-                   (shared_state.get_mode() == "autosession" and shared_state.rotary_last_mode != "autosession"):
-                    input_handler.setup_rotary_values()
-                shared_state.current_menu_position = 1
-                # start async home-screen updater (no-op if already running)
-                display_manager.start_home(heater, loop=asyncio.get_event_loop() if asyncio else None, interval_ms=200)
-            else:
-                # leaving home/menu selection - stop async home updates
+        try:
+            # Check and display any active errors
+            if shared_state.has_error():
+                display_manager.show_error()
+            # Check if user clicked middle button to show temp_max_watts screen
+            elif shared_state.middle_button_pressed:
                 display_manager.stop_home()
-                
-                # Check if user clicked on profiles screen to load a profile
-                if shared_state.rotary_last_mode == "Profiles" and shared_state.profile_load_pending:
-                    if shared_state.profile_list:
-                        success, message = apply_and_save_profile(shared_state.profile_list[shared_state.profile_selection_index], shared_state)
-                        #display_manager.display_error(message, 2, False)
-                    shared_state.profile_load_pending = False
-                    # Return to home screen
-                    shared_state.current_menu_position = 1
-                    shared_state.rotary_last_mode = None
-                # Check if user clicked on autosession profiles screen to load an autosession profile
-                elif shared_state.rotary_last_mode == "Autosession Profiles" and shared_state.autosession_profile_load_pending:
-                    if shared_state.autosession_profile_list:
-                        success, message = apply_and_save_autosession_profile(shared_state.autosession_profile_list[shared_state.autosession_profile_selection_index], shared_state)
-                        #display_manager.display_error(message, 2, False)
-                    shared_state.autosession_profile_load_pending = False
-                    # Return to home screen
-                    shared_state.current_menu_position = 1
-                    shared_state.rotary_last_mode = None
-                else:
-                    if shared_state.rotary_last_mode != shared_state.menu_options[shared_state.current_menu_position]:
-                        input_handler.setup_rotary_values()
-                    menu_system.display_selected_option()
-        else:
-            # we're in the menu; ensure async home-screen updates are stopped
-            display_manager.stop_home()
-            if shared_state.rotary_last_mode != "menu":
-                shared_state.current_menu_position = 0
+                shared_state.in_menu = False  # Make sure we exit menu mode
+                shared_state.temp_max_watts_screen_active = True
+                shared_state.temp_max_watts_start_time = utime.ticks_ms()
+                shared_state.rotary_last_mode = None  # Reset so setup_rotary_values sets it to "Temp Max Watts"
                 input_handler.setup_rotary_values()
-                # Force an initial menu draw when entering menu
-                try:
-                    menu_system.display_menu()
-                except Exception:
+                display_manager.show_screen_temp_max_watts()
+                shared_state.middle_button_pressed = False
+            # Handle temp_max_watts screen display with timeout
+            elif shared_state.temp_max_watts_screen_active:
+                # Check if timeout has elapsed (2 seconds with no rotary activity)
+                elapsed = utime.ticks_diff(utime.ticks_ms(), shared_state.temp_max_watts_start_time)
+                if elapsed >= 2000:
+                    # Timeout - return to home screen
+                    shared_state.temp_max_watts_screen_active = False
+                    shared_state.rotary_last_mode = None
+                    shared_state.current_menu_position = 1
+                else:
+                    # Still displaying - update the screen
+                    display_manager.show_screen_temp_max_watts()
+            elif not shared_state.in_menu:
+                if shared_state.current_menu_position <= 1:
+                    # ensure rotary values set once (but not if temp_max_watts screen is active)
+                    # Also ensure rotary is reconfigured when autosession starts/stops
+                    # Don't reconfigure if we're already in autosession mode with rotary set to autosession
+                    if (shared_state.rotary_last_mode != "setpoint" and shared_state.rotary_last_mode != "autosession" and not shared_state.temp_max_watts_screen_active) or \
+                       (shared_state.get_mode() == "autosession" and shared_state.rotary_last_mode != "autosession"):
+                        input_handler.setup_rotary_values()
+                    shared_state.current_menu_position = 1
+                    # start async home-screen updater (no-op if already running)
+                    display_manager.start_home(heater, loop=asyncio.get_event_loop() if asyncio else None, interval_ms=200)
+                else:
+                    # leaving home/menu selection - stop async home updates
+                    display_manager.stop_home()
+                    
+                    # Check if user clicked on profiles screen to load a profile
+                    if shared_state.rotary_last_mode == "Profiles" and shared_state.profile_load_pending:
+                        if shared_state.profile_list:
+                            success, message = apply_and_save_profile(shared_state.profile_list[shared_state.profile_selection_index], shared_state)
+                            #display_manager.display_error(message, 2, False)
+                        shared_state.profile_load_pending = False
+                        # Return to home screen
+                        shared_state.current_menu_position = 1
+                        shared_state.rotary_last_mode = None
+                    # Check if user clicked on autosession profiles screen to load an autosession profile
+                    elif shared_state.rotary_last_mode == "Autosession Profiles" and shared_state.autosession_profile_load_pending:
+                        if shared_state.autosession_profile_list:
+                            success, message = apply_and_save_autosession_profile(shared_state.autosession_profile_list[shared_state.autosession_profile_selection_index], shared_state)
+                            #display_manager.display_error(message, 2, False)
+                        shared_state.autosession_profile_load_pending = False
+                        # Return to home screen
+                        shared_state.current_menu_position = 1
+                        shared_state.rotary_last_mode = None
+                    else:
+                        if shared_state.rotary_last_mode != shared_state.menu_options[shared_state.current_menu_position]:
+                            input_handler.setup_rotary_values()
+                        menu_system.display_selected_option()
+            else:
+                # we're in the menu; ensure async home-screen updates are stopped
+                display_manager.stop_home()
+                if shared_state.rotary_last_mode != "menu":
+                    shared_state.current_menu_position = 0
+                    input_handler.setup_rotary_values()
+                    # Force an initial menu draw when entering menu
+                    try:
+                        menu_system.display_menu()
+                    except Exception:
+                        pass
+                if shared_state.menu_selection_pending:
+                    menu_system.handle_menu_selection()
+                    shared_state.menu_selection_pending = False
+                elif shared_state.rotary_direction is not None:
+                    menu_system.navigate_menu(shared_state.rotary_direction)
+                    shared_state.rotary_direction = None
+                else:
                     pass
-            if shared_state.menu_selection_pending:
-                menu_system.handle_menu_selection()
-                shared_state.menu_selection_pending = False
-            elif shared_state.rotary_direction is not None:
-                menu_system.navigate_menu(shared_state.rotary_direction)
-                shared_state.rotary_direction = None
+            
+            # LED status updates (safe to always execute)
+            if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8) and shared_state.heater_temperature <= (shared_state.temperature_setpoint+8):
+                led_red_pin.on()
             else:
-                pass
-        #Need to make '8' in shared state so can be set via profile
-        if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8) and shared_state.heater_temperature <= (shared_state.temperature_setpoint+8):
-            led_red_pin.on()
-        else:
-            led_red_pin.off()
+                led_red_pin.off()
 
-        # Handle autosession logging start/stop
-        if shared_state.autosession_logging_enabled:
-            if shared_state.get_mode() == "autosession":
-                # Start logging if not already active
-                if not shared_state.autosession_logging_active:
-                    # Ensure any previous buffer is flushed before starting new logging
-                    if shared_state.autosession_log_file is not None:
+            # Handle autosession logging start/stop
+            if shared_state.autosession_logging_enabled:
+                if shared_state.get_mode() == "autosession":
+                    # Start logging if not already active
+                    if not shared_state.autosession_logging_active:
+                        # Ensure any previous buffer is flushed before starting new logging
+                        if shared_state.autosession_log_file is not None:
+                            flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
+                        shared_state.autosession_logging_active = True
+                        shared_state.autosession_log_file, _ = create_autosession_log_file(shared_state.profile, shared_state.autosession_profile_name)
+                        shared_state.autosession_log_buffer = []
+                else:
+                    # Stop logging if it was active
+                    if shared_state.autosession_logging_active:
+                        shared_state.autosession_logging_active = False
                         flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
-                    shared_state.autosession_logging_active = True
-                    shared_state.autosession_log_file, _ = create_autosession_log_file(shared_state.profile, shared_state.autosession_profile_name)
-                    shared_state.autosession_log_buffer = []
+                        shared_state.autosession_log_file = None
+                        shared_state.autosession_log_buffer = []
             else:
-                # Stop logging if it was active
+                # If logging is disabled, ensure we stop any active logging
                 if shared_state.autosession_logging_active:
                     shared_state.autosession_logging_active = False
                     flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
                     shared_state.autosession_log_file = None
                     shared_state.autosession_log_buffer = []
-        else:
-            # If logging is disabled, ensure we stop any active logging
-            if shared_state.autosession_logging_active:
-                shared_state.autosession_logging_active = False
-                flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
-                shared_state.autosession_log_file = None
-                shared_state.autosession_log_buffer = []
 
-
-        if shared_state.get_mode() == "Session":
-            if (shared_state.session_timeout - shared_state.get_session_mode_duration()) > 50000 and (shared_state.session_timeout - shared_state.get_session_mode_duration()) < 60000:
-                led_blue_pin.on()
-            else:
-                led_blue_pin.off()
-            # Only check setpoint reached in temperature-PID mode
-            if shared_state.control == 'temperature_pid':
-                if shared_state.session_setpoint_reached == False:
-                    if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
-                        shared_state.session_setpoint_reached = True
-                        buzzer_play_tone(buzzer, 1500, 350)
-                        if shared_state.session_reset_pid_when_near_setpoint:
-                            shared_state.pid.reset()
-                    # Prevent overshoot by resetting PID if integral is too high while still far from setpoint
-                    #elif shared_state.heater_temperature >= (shared_state.temperature_setpoint - 10) and shared_state.pid.components[1] > 10:
-                    #    shared_state.pid.reset()
+            # PID overshoot prevention logic
+            if shared_state.get_mode() == "Session":
+                if (shared_state.session_timeout - shared_state.get_session_mode_duration()) > 50000 and (shared_state.session_timeout - shared_state.get_session_mode_duration()) < 60000:
+                    led_blue_pin.on()
                 else:
-                    #Need to make '15' in shared state so can be set via profile
-                    #If reached setpoint and then temperature drops dramatically Integral can increase to much 
-                    #need to catch runaway temp here after we have already reached setpointand reset pid stats 
+                    led_blue_pin.off()
+                # Only check setpoint reached in temperature-PID mode
+                if shared_state.control == 'temperature_pid-old':
+                    if shared_state.session_setpoint_reached == False:
+                        if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
+                            shared_state.session_setpoint_reached = True
+                            buzzer_play_tone(buzzer, 1500, 350)
+                            if shared_state.session_reset_pid_when_near_setpoint:
+                                shared_state.pid.reset()
+                    else:
+                        if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
+                            shared_state.pid.reset()
+
+               #testing different way to handle this
+                elif shared_state.control == "temperature_pid":   
+                    #need to reset pid if big temp change from setpoint too
                     if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
                         shared_state.pid.reset()
-        elif shared_state.get_mode() == "autosession":
-            #need to reset pid if big temp change from setpoint too
-            if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
-                shared_state.pid.reset()
-            # Prevent overshoot by resetting PID if integral is too high while still far from setpoint
-            elif shared_state.heater_temperature >= (shared_state.temperature_setpoint - 10) and shared_state.pid.components[1] > 10:
-                shared_state.pid.reset()
+                    # Prevent overshoot by resetting PID if integral is too high while still far from setpoint
+                    elif shared_state.heater_temperature >= (shared_state.temperature_setpoint - 10) and shared_state.pid.components[1] > 20:
+                        shared_state.pid.reset()         
 
-        if enable_watchdog:
-            try:
-                watchdog.feed()
-            except Exception:
-                pass
+            elif shared_state.get_mode() == "autosession":
+                #need to reset pid if big temp change from setpoint too
+                if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
+                    shared_state.pid.reset()
+                # Prevent overshoot by resetting PID if integral is too high while still far from setpoint
+                elif shared_state.heater_temperature >= (shared_state.temperature_setpoint - 10) and shared_state.pid.components[1] > 20:
+                    shared_state.pid.reset()
+
+            if enable_watchdog:
+                try:
+                    watchdog.feed()
+                except Exception:
+                    pass
+        
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+            import traceback
+            traceback.print_exc()
+        
         await asyncio.sleep_ms(70)
 
 if __name__ == '__main__':

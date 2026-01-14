@@ -1,5 +1,6 @@
 from machine import Pin
 from max6675_utime import MAX6675
+import utime
 
 class Thermocouple:
     def __init__(self, sck_pin_number, cs_pin_number, so_pin_number, heater_on_temperature_difference_threshold, shared_state=None):
@@ -18,12 +19,14 @@ class Thermocouple:
         self.filtered_temp_counter = 0
         try:
             self.thermocouple_sensor = MAX6675(self.sck, self.cs, self.so)
+            utime.sleep_ms(500)
             #self.update_filtered_temp(False) # Initialize last_known_safe_temp
             try:
-                self.read_raw_temp()
+                raw_reading = self.read_raw_temp()
             except Exception as e:
                 print("Error reading raw temperature during initialization:", e)
-            if(self.read_raw_temp() > 0):  #do a read to tigger error if there is one
+                raw_reading = None
+            if raw_reading is not None and raw_reading > 0:  #do a read to tigger error if there is one
                 print("Thermocouple initialised.")
             else:
                 raise Exception("Thermocouple read error during initialisation.")
