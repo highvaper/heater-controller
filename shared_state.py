@@ -168,6 +168,7 @@ class SharedState:
         self.autosession_log_file = None  # File object for autosession CSV logging
         self.autosession_log_buffer = []  # Buffer for autosession log data (flushed at configured threshold)
         self.autosession_log_buffer_flush_threshold = 20  # Number of lines before buffer is flushed to file (can be set in profile)
+        self.saved_temperature_setpoint = None  # Save temperature_setpoint before entering autosession to restore after
         
         self.session_start_time = 0
         self._mode = "Off" 
@@ -220,6 +221,7 @@ class SharedState:
             self.session_start_time = utime.ticks_ms()
             self._mode = "Session"
         elif new_mode == "autosession":
+            self.saved_temperature_setpoint = self.temperature_setpoint
             self.autosession_start_time = utime.ticks_ms()
             self._mode = "autosession"
         else:
@@ -227,6 +229,9 @@ class SharedState:
         if new_mode == "Off":
             self.led_blue_pin.off() # In case session manually ended when light on
             self.led_green_pin.off()
+            self.rotary_last_mode = None #Reset rotary mode so it reconfigures next time
+            self.temperature_setpoint = self.saved_temperature_setpoint
+            self.pid.setpoint = self.temperature_setpoint
             # Clear heater-too_hot error when turning off the heater
             if self.current_error and self.current_error[0] == "heater-too_hot":
                 self.clear_error()

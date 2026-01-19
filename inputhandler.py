@@ -231,8 +231,10 @@ class InputHandler:
                 if self.shared_state.in_menu:
                     self.shared_state.menu_selection_pending = True
 
-            if not self.click_check_timer.is_timer_running():
-                self.click_check_timer.start()
+            # Restart timer on each click to extend the detection window
+            if self.click_check_timer.is_timer_running():
+                self.click_check_timer.stop()
+            self.click_check_timer.start()
         else: # Button is released
             self.rotary_used = False # Reset if rotary use between presses
             if self.button_pressed:
@@ -321,11 +323,29 @@ class InputHandler:
             # Triple-click detected: activate/deactivate autosession
             if not self.shared_state.in_menu and not self.rotary_used:
                 if self.shared_state.autosession_profile and self.shared_state.get_mode() != "autosession":
-                    # Activate autosession
+                    # Activate autosession - save current temperature_setpoint first
+                    self.shared_state.saved_temperature_setpoint = self.shared_state.temperature_setpoint
                     self.shared_state.set_mode("autosession")
                 elif self.shared_state.get_mode() == "autosession":
-                    # Deactivate autosession
+                    # Deactivate autosession and restore saved temperature_setpoint
                     self.shared_state.set_mode("Off")
+                    self.shared_state.temperature_setpoint = self.shared_state.saved_temperature_setpoint
+                    self.shared_state.pid.setpoint = self.shared_state.temperature_setpoint
+                    self.shared_state.rotary_last_mode = None
+
+        
+        elif self.middle_button_click_counter == 4:
+            # Quadruple-click detected: stop autosession and switch to normal session
+            if not self.shared_state.in_menu and not self.rotary_used:
+                if self.shared_state.get_mode() == "autosession":
+                    # Safely stop autosession first (allows log file to be flushed and closed)
+                    # then start a normal session and restore saved temperature_setpoint
+                    self.shared_state.set_mode("Off")
+                    self.shared_state.temperature_setpoint = self.shared_state.saved_temperature_setpoint
+                    self.shared_state.pid.setpoint = self.shared_state.temperature_setpoint
+                    # Reset rotary_last_mode so it reconfigures for the new mode
+                    self.shared_state.rotary_last_mode = None
+                    self.shared_state.set_mode("Session")
         
         self.middle_button_click_counter = 0  # Reset the click counter
         if self.middle_button_click_check_timer.is_timer_running():
@@ -382,8 +402,10 @@ class InputHandler:
                     
                 self.middle_button_last_press_time = current_time  # Update the last button press time
 
-                if not self.middle_button_click_check_timer.is_timer_running():
-                    self.middle_button_click_check_timer.start()
+                # Restart timer on each click to extend the detection window
+                if self.middle_button_click_check_timer.is_timer_running():
+                    self.middle_button_click_check_timer.stop()
+                self.middle_button_click_check_timer.start()
         else: # Button is released
             self.middle_button_pressed = False
 
