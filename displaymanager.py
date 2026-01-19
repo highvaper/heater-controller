@@ -1,5 +1,6 @@
 import utime
 import uasyncio as asyncio
+from machine import reset
 #from customtimer import CustomTimer
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
@@ -636,6 +637,34 @@ class DisplayManager:
         self.display.show()
 
 
+    def show_screen_start_autosession(self):
+        """Start autosession, update menu, and return to home screen."""
+        if self.shared_state.autosession_profile:
+            self.shared_state.set_mode("autosession")
+        self.shared_state.update_menu_options()
+        self.shared_state.current_menu_position = 0  # Reset to Home Screen
+        self.display.fill(0)
+        self.display.text("Starting Autosession...", 0, 16)
+        self.display.show()
+        utime.sleep_ms(500)
+
+    def show_screen_stop_autosession(self):
+        """Stop autosession, update menu, and return to home screen."""
+        self.shared_state.set_mode("Off")
+        self.shared_state.update_menu_options()
+        self.shared_state.current_menu_position = 0  # Reset to Home Screen
+        self.display.fill(0)
+        self.display.text("Stopping Autosession...", 0, 16)
+        self.display.show()
+        utime.sleep_ms(500)
+
+    def show_screen_reboot(self):
+        """Display reboot message and perform system reboot."""
+        self.display.fill(0)
+        self.display.text("Rebooting...", 0, 16)
+        self.display.show()
+        utime.sleep_ms(1000)
+        reset()
 
 
     def display_screen(self, option):

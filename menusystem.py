@@ -78,7 +78,6 @@ class MenuSystem:
             self.exit_menu()
             return
 
-
         self.display_manager.display_screen(selected_option)
         self.exit_menu()
 
@@ -104,4 +103,5 @@ class MenuSystem:
         self.shared_state.in_menu = False
 #        self.shared_state.current_menu_position = 0
         if self.timeout_timer.is_timer_running(): self.timeout_timer.stop()
+
         #print("Menu timeout reached, exiting menu.")

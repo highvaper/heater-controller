@@ -113,19 +113,7 @@ class SharedState:
         # setup_rotary_values in inputhandler 
         # options screen timeout to return to home (or none for graphs etc)
         # Menu options: show current profile and autosession profile if set
-        self.menu_options = [
-            f"{self.profile}",
-            "Home Screen",
-            "Profiles",
-            "Autosession Profiles",
-            "Graph Setpoint",
-            "Graph Line",
-            "Graph Bar",
-            "Temp Watts Line",
-            "Watts Line",
-            "Show Settings",
-            "Display Contrast"
-        ]
+        self.menu_options = []  # Will be populated dynamically by get_menu_options()
    
         # Battery/power info screen  - can we get volts & amps? and move to where pid is on home? + level 
         # Heater / coil info screen - coil length? coil ohm? (user may need to provide ohm reading at 25C)  
@@ -160,7 +148,6 @@ class SharedState:
         self.autosession_profile_load_pending = False  # Flag when user clicks to load autosession profile
         self.autosession_profile = None  # Loaded AutoSessionTemperatureProfile object
         self.autosession_profile_name = None  # Name of loaded autosession profile
-        self.autosession_active = False  # True when autosession is currently running
         self.autosession_start_time = 0  # Timestamp when autosession started
         self.autosession_time_offset_ms = 0  # Rotary dial offset for autosession time in milliseconds (positive = advance, negative = rewind)
         self.autosession_time_adjustment_step = 10  # Rotary dial step size in seconds for autosession time adjustment (loaded from profile config)
@@ -171,7 +158,7 @@ class SharedState:
         self.saved_temperature_setpoint = None  # Save temperature_setpoint before entering autosession to restore after
         
         self.session_start_time = 0
-        self._mode = "Off" 
+        self.mode = "Off" 
 
         # Error tracking (simpler approach without exceptions)
         self.current_error = None  # Tuple of (error_code, error_message) or None
@@ -195,14 +182,17 @@ class SharedState:
         # Controls that are currently enabled/available on this hardware
         # Possible values: 'temperature_pid', 'duty_cycle', 'watts'
         self.enabled_controls = ['temperature_pid', 'duty_cycle', 'watts']
+        
+        # Initialize menu options
+        self.update_menu_options()
 
 
     def get_mode(self):
-        if self._mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
+        if self.mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
             session_start_time = 0
             self.led_green_pin.off()
             self.led_blue_pin.off()  # In case session manually ended when light on
-            self._mode = "Off"  # Set off here rather than after playing sounds as this can get called again while sounds being played
+            self.mode = "Off"  # Set off here rather than after playing sounds as this can get called again while sounds being played
             # Clear heater-too_hot error when session ends
             if self.current_error and self.current_error[0] == "heater-too_hot":
                 self.clear_error()
@@ -211,21 +201,22 @@ class SharedState:
 #            buzzer_play_tone(buzzer, 1000, 200)
 #            utime.sleep_ms(200)
 #            buzzer_play_tone(buzzer, 500, 200)
-        return self._mode
+        return self.mode
 
     def set_mode(self, new_mode):
         if new_mode in ["Off", "Manual"]:
-            if self._mode == "Session": self.session_start_time = 0
-            self._mode = new_mode
+            if self.mode == "Session": self.session_start_time = 0
+            self.mode = new_mode
         elif new_mode == "Session":
             self.session_start_time = utime.ticks_ms()
-            self._mode = "Session"
+            self.mode = "Session"
         elif new_mode == "autosession":
             self.saved_temperature_setpoint = self.temperature_setpoint
             self.autosession_start_time = utime.ticks_ms()
-            self._mode = "autosession"
+            self.mode = "autosession"
         else:
             raise ValueError("Invalid mode. Must be 'Off', 'Session', 'Manual', or 'autosession'")
+        
         if new_mode == "Off":
             self.led_blue_pin.off() # In case session manually ended when light on
             self.led_green_pin.off()
@@ -239,6 +230,39 @@ class SharedState:
             self.led_green_pin.on()
             self.pid.reset()
             print("PID Stats reset")
+        
+        # Always update menu to keep it in sync with current state
+        self.update_menu_options()
+
+    def get_menu_options(self):
+        """Build and return menu options dynamically based on current state."""
+        options = [
+            f"{self.profile}",
+            "Home Screen",
+        ]
+        if self.mode == "autosession":
+            options.append("Stop Autosession")
+        else:
+            options.append("Start Autosession")
+        
+        options.extend([
+            "Profiles",
+            "Autosession Profiles",
+            "Graph Setpoint",
+            "Graph Line",
+            "Graph Bar",
+            "Temp Watts Line",
+            "Watts Line",
+            "Show Settings",
+            "Display Contrast",
+            "Reboot"
+        ])
+        
+        return options
+    
+    def update_menu_options(self):
+        """Update menu_options list with current state."""
+        self.menu_options = self.get_menu_options()
 
     def get_session_mode_duration(self):
         return utime.ticks_diff(utime.ticks_ms(), self.session_start_time)
