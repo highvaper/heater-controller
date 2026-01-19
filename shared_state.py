@@ -188,8 +188,8 @@ class SharedState:
 
 
     def get_mode(self):
-        if self.mode == "Session" and (self.session_timeout - self.get_session_mode_duration()) < 0:
-            session_start_time = 0
+        if self.mode == "Session" and self.session_timeout is not None and self.session_timeout > 0 and (self.session_timeout - self.get_session_mode_duration()) < 0:
+            self.session_start_time = 0
             self.led_green_pin.off()
             self.led_blue_pin.off()  # In case session manually ended when light on
             self.mode = "Off"  # Set off here rather than after playing sounds as this can get called again while sounds being played
@@ -221,8 +221,9 @@ class SharedState:
             self.led_blue_pin.off() # In case session manually ended when light on
             self.led_green_pin.off()
             self.rotary_last_mode = None #Reset rotary mode so it reconfigures next time
-            self.temperature_setpoint = self.saved_temperature_setpoint
-            self.pid.setpoint = self.temperature_setpoint
+            if self.saved_temperature_setpoint is not None:
+                self.temperature_setpoint = self.saved_temperature_setpoint
+                self.pid.setpoint = self.temperature_setpoint
             # Clear heater-too_hot error when turning off the heater
             if self.current_error and self.current_error[0] == "heater-too_hot":
                 self.clear_error()
@@ -265,6 +266,8 @@ class SharedState:
         self.menu_options = self.get_menu_options()
 
     def get_session_mode_duration(self):
+        if self.session_start_time is None or self.session_start_time == 0:
+            return 0
         return utime.ticks_diff(utime.ticks_ms(), self.session_start_time)
     
     def set_error(self, error_code, error_message=None):

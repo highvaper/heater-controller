@@ -5,13 +5,20 @@ from machine import reset
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
 class DisplayManager:
-
+    # Default display dimensions (can be overridden by driver classes)
+    width = 128
+    height = 32
     
     def __init__(self, display, shared_state):
     
         print("DisplayManager Initialising ...")
         self.display = display
         self.shared_state = shared_state
+        
+        # Get display dimensions from driver class attributes
+        self.display_width = self.__class__.width
+        self.display_height = self.__class__.height
+        
         self.display_heartbeat_y = 0
         self.growing = True
         self.scroll_position = 0
@@ -26,17 +33,19 @@ class DisplayManager:
 
 
     def display_heartbeat(self):
+        max_x = self.display_width - 1
+        max_y = self.display_height
         if self.growing:
             # Grow the rectangle from the top right corner
-            self.display.fill_rect(127, 32 - self.display_heartbeat_y, 1, self.display_heartbeat_y + 1, 1)
+            self.display.fill_rect(max_x, max_y - self.display_heartbeat_y, 1, self.display_heartbeat_y + 1, 1)
             self.display_heartbeat_y += 1
-            if self.display_heartbeat_y >= 32:
-                self.display_heartbeat_y = 31 # Start shrinking
+            if self.display_heartbeat_y >= max_y:
+                self.display_heartbeat_y = max_y - 1 # Start shrinking
                 self.growing = False
         else:
             # Shrink the rectangle from the bottom
-            self.display.fill_rect(127, 32 - self.display_heartbeat_y, 1, self.display_heartbeat_y + 1, 1) # Ensure the rectangle is drawn before shrinking
-            self.display.fill_rect(127, 32 - (self.display_heartbeat_y + 1), 1, 1, 0) # Clear the bottom pixel
+            self.display.fill_rect(max_x, max_y - self.display_heartbeat_y, 1, self.display_heartbeat_y + 1, 1) # Ensure the rectangle is drawn before shrinking
+            self.display.fill_rect(max_x, max_y - (self.display_heartbeat_y + 1), 1, 1, 0) # Clear the bottom pixel
             self.display_heartbeat_y -= 1
             if self.display_heartbeat_y <= 0:
                 self.display_heartbeat_y = 0 # Reset to start growing again from the top
@@ -185,7 +194,7 @@ class DisplayManager:
         max_temp = max(temperature_readings.values())
         temp_range = max_temp - min_temp
         if temp_range == 0: temp_range = 1
-        display_height = self.display.height
+        display_height = self.display_height
 
         # Use cached min and max times
         min_time = self.shared_state.temperature_min_time
@@ -193,7 +202,7 @@ class DisplayManager:
         x_range = max_time - min_time
         if x_range == 0: x_range = 1
         
-        x_scale = self.display.width / x_range
+        x_scale = self.display_width / x_range
         y_scale = display_height / temp_range
 
         for time, temp in temperature_readings.items():
@@ -217,9 +226,9 @@ class DisplayManager:
         #    t = t + " Session: " + str(int((self.shared_state.session_timeout - self.shared_state.get_session_mode_duration())/1000))
         self.display.text(t, 0, 0, 1)
         
-        text_x = 104  #Assuming 128 pix wide 
-        if(last_temp > 99): text_x = 98
-        self.display.text(last_temp_str, text_x, 24, 0)  # invert temp 
+        text_x = self.display_width - 24  # Position near right edge
+        if(last_temp > 99): text_x = self.display_width - 30
+        self.display.text(last_temp_str, text_x, self.display_height - 8, 0)  # invert temp 
 
         self.display.show()
 
@@ -238,11 +247,11 @@ class DisplayManager:
         x_range = max_time - min_time
         if x_range == 0: x_range = 1
 
-        x_scale = self.display.width / x_range
+        x_scale = self.display_width / x_range
 
         for time, temp in temperature_readings.items():
             x = int((time - min_time) * x_scale)
-            y = self.display.height - int(temp / 10) # Adjust the y-coordinate to represent each pixel as 10°C
+            y = self.display_height - int(temp / 10) # Adjust the y-coordinate to represent each pixel as 10°C
 
             # Draw a single pixel for each temperature reading
             self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
@@ -251,9 +260,9 @@ class DisplayManager:
         last_temp_str = str(last_temp) + "C"
 
         # Draw dotted setpoint line
-        setpoint_y = self.display.height - int(self.shared_state.temperature_setpoint / 10) # Calculate the y-coordinate for the checkpoint
+        setpoint_y = self.display_height - int(self.shared_state.temperature_setpoint / 10) # Calculate the y-coordinate for the checkpoint
         dot_spacing = 4 # Adjust this value to change the spacing between dots
-        for x in range(0, self.display.width, dot_spacing):
+        for x in range(0, self.display_width, dot_spacing):
             self.display.pixel(x, setpoint_y, 1) 
             
         # Display the last temperature reading and other information
@@ -275,13 +284,13 @@ class DisplayManager:
             return
 
         setpoint = self.shared_state.temperature_setpoint
-        display_height = self.display.height
+        display_height = self.display_height
         zoom_range = 15 # This range is not used in the adjusted method
 
         setpoint_y = display_height // 2 # Setpoint is in the middle of the screen
 
         for time, temp in temperature_readings.items():
-            x = int((time - self.shared_state.temperature_min_time) * (self.display.width / (self.shared_state.temperature_max_time - self.shared_state.temperature_min_time)))
+            x = int((time - self.shared_state.temperature_min_time) * (self.display_width / (self.shared_state.temperature_max_time - self.shared_state.temperature_min_time)))
             # Calculate the y-coordinate relative to the setpoint
             y = int(setpoint_y + (temp - setpoint) * -1)
             # Ensure y-coordinate does not go below 0 or above the display height
@@ -292,7 +301,7 @@ class DisplayManager:
         # Draw dotted setpoint line
         dot_spacing = 4
         counter = 0
-        for x in range(0, self.display.width, 1):
+        for x in range(0, self.display_width, 1):
             if counter < 2: # Draw on pixels for the first 2 iterations
                 self.display.pixel(x, setpoint_y, 1) # Draw an on pixel
             counter += 1 # Increment the counter
@@ -336,11 +345,11 @@ class DisplayManager:
         x_range = watt_max_time - watt_min_time
         if x_range == 0: x_range = 1
 
-        x_scale = self.display.width / x_range
-        y_scale = self.shared_state.max_watts / self.display.height
+        x_scale = self.display_width / x_range
+        y_scale = self.shared_state.max_watts / self.display_height
         for time, watt in watt_readings.items():
             x = int((time - watt_min_time) * x_scale)
-            y = self.display.height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
+            y = self.display_height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
 
             # Draw a single pixel for each watt reading
             self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
@@ -354,11 +363,11 @@ class DisplayManager:
         x_range = temp_max_time - temp_min_time
         if x_range == 0: x_range = 1
 
-        x_scale = self.display.width / x_range
+        x_scale = self.display_width / x_range
 
         for time, temp in temperature_readings.items():
             x = int((time - temp_min_time) * x_scale)
-            y = self.display.height - int(temp / 10) # Adjust the y-coordinate to represent each pixel as 10°C
+            y = self.display_height - int(temp / 10) # Adjust the y-coordinate to represent each pixel as 10°C
 
             # Draw a dotted line
             if(x % 2) == 0:
@@ -368,9 +377,9 @@ class DisplayManager:
         last_temp_str = str(last_temp) + "C"
 
         # Draw dotted setpoint line
-        setpoint_y = self.display.height - int(self.shared_state.temperature_setpoint / 10) # Calculate the y-coordinate for the checkpoint
+        setpoint_y = self.display_height - int(self.shared_state.temperature_setpoint / 10) # Calculate the y-coordinate for the checkpoint
         dot_spacing = 4 # Adjust this value to change the spacing between dots
-        for x in range(0, self.display.width, dot_spacing):
+        for x in range(0, self.display_width, dot_spacing):
             self.display.pixel(x, setpoint_y, 1) 
             
         t = last_temp_str + " " + last_watts_str
@@ -393,11 +402,11 @@ class DisplayManager:
         x_range = max_time - min_time
         if x_range == 0: x_range = 1
 
-        x_scale = self.display.width / x_range
-        y_scale = self.shared_state.max_watts / self.display.height
+        x_scale = self.display_width / x_range
+        y_scale = self.shared_state.max_watts / self.display_height
         for time, watt in watt_readings.items():
             x = int((time - min_time) * x_scale)
-            y = self.display.height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
+            y = self.display_height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
 
             # Draw a single pixel for each watt reading
             self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
@@ -435,7 +444,7 @@ class DisplayManager:
     
 
     def get_centered_text_start_position(self, text):
-        display_width = self.display.width
+        display_width = self.display_width
         text_width = len(text) * 6
         return (display_width - text_width) // 2
 
@@ -488,7 +497,8 @@ class DisplayManager:
             else:
                 t = "M: Auto Session"
         elif shared_state.get_mode() == "Session":
-            t = t + " " + str(int((shared_state.session_timeout - shared_state.get_session_mode_duration())/1000)) + "s"
+            if shared_state.session_timeout is not None and shared_state.session_timeout > 0:
+                t = t + " " + str(int((shared_state.session_timeout - shared_state.get_session_mode_duration())/1000)) + "s"
         self.display.text(t, 0, 16)
 
         if self.shared_state.control == 'temperature_pid':
@@ -703,3 +713,47 @@ class DisplayManager:
                     pass
             # default: single synchronous draw
             method()
+
+
+class DisplayManagerFactory:
+    """Factory to create DisplayManager with optional driver overrides."""
+    
+    @staticmethod
+    def create_display_manager(display_type, display, shared_state):
+        """Create a DisplayManager, optionally extended with driver-specific overrides.
+        
+        Args:
+            display_type: String like 'SSD1306_128x32' or 'SSD1306_128x64'
+            display: The display hardware object
+            shared_state: The shared state object
+            
+        Returns:
+            DisplayManager instance (possibly with driver overrides)
+        """
+        print(f"DisplayManagerFactory: Attempting to load driver '{display_type}'")
+        # Import driver dynamically
+        driver_class = None
+        try:
+            if display_type == 'SSD1306_128x64':
+                from displaydrivers.SSD1306_128x64 import SSD1306_128x64_Driver
+                driver_class = SSD1306_128x64_Driver
+                print(f"DisplayManagerFactory: Successfully loaded SSD1306_128x64_Driver")
+            else:
+                from displaydrivers.SSD1306_128x32 import SSD1306_128x32_Driver
+                driver_class = SSD1306_128x32_Driver  # Default driver
+                print(f"DisplayManagerFactory: Successfully loaded SSD1306_128x32_Driver")
+        except ImportError as e:
+            print(f"DisplayManagerFactory: Failed to import driver - {e}")
+        
+        if driver_class is not None:
+            # Create a combined class that inherits from driver first (for overrides)
+            # then DisplayManager for defaults
+            class CombinedDisplayManager(driver_class, DisplayManager):
+                pass
+            print(f"DisplayManagerFactory: Creating combined DisplayManager with driver (width={driver_class.width}, height={driver_class.height})")
+            return CombinedDisplayManager(display, shared_state)
+        else:
+            # No driver found, use base DisplayManager
+            print(f"DisplayManagerFactory: Falling back to base DisplayManager (width={DisplayManager.width}, height={DisplayManager.height})")
+            return DisplayManager(display, shared_state)
+            return DisplayManager(display, shared_state)
