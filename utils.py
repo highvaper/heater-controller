@@ -195,7 +195,7 @@ def load_profile(profile_name, shared_state):
                                     config[key] = value
                                 else:
                                     print(f"Warning: power_type must be 'mains', 'lipo', or 'lead': {value}")
-                            elif key in ['display_rotate', 'session_reset_pid_when_near_setpoint', 'autosession_logging_enabled']:
+                            elif key in ['display_rotate', 'autosession_logging_enabled']:
                                 config[key] = value.lower() in ['true', '1', 'yes']
                             elif key == 'pid_temperature_tunings':
                                 # Parse PID tunings as comma-separated float values: P,I,D

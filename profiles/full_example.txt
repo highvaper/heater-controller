@@ -74,10 +74,6 @@ session_extend_time=120
 # Window for detecting multi-click inputs
 click_check_timeout=800
 
-# Reset PID stats when near setpoint: boolean (true or false)
-# Helps reduce overshoot by resetting PID statistics
-session_reset_pid_when_near_setpoint=true
-
 # ===== TEMPERATURE MONITORING =====
 # PI Pico temperature limit: int (degrees C)
 # System shuts down heater if PI temperature exceeds this
@@ -90,6 +86,14 @@ pid_temperature_tunings=2.3,0.03,0
 
 # Degrees above setpoint at which PID will be reset if temperature spikes after reaching setpoint
 pid_reset_high_temperature=15
+
+# Degrees below setpoint threshold for PID reset check: int
+# Used with integral threshold to prevent overshoot
+pid_reset_low_temperature=10
+
+# Integral component threshold to trigger PID reset: float
+# PID will reset if integral exceeds this value while temp is near setpoint
+pid_reset_i_threshold=20
 
 # ===== DISPLAY =====
 # Display contrast level: int (0-255)

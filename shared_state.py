@@ -170,8 +170,6 @@ class SharedState:
         self.autosession_log_buffer_flush_threshold = 20  # Number of lines before buffer is flushed to file (can be set in profile)
         
         self.session_start_time = 0
-        self.session_setpoint_reached = False
-        self.session_reset_pid_when_near_setpoint = True # Seems to help improve overshoot reduction by resetting pid stats once near setpoint from cold
         self._mode = "Off" 
 
         # Error tracking (simpler approach without exceptions)
@@ -204,7 +202,6 @@ class SharedState:
             self.led_green_pin.off()
             self.led_blue_pin.off()  # In case session manually ended when light on
             self._mode = "Off"  # Set off here rather than after playing sounds as this can get called again while sounds being played
-            self.session_setpoint_reached = False
             # Clear heater-too_hot error when session ends
             if self.current_error and self.current_error[0] == "heater-too_hot":
                 self.clear_error()
@@ -216,7 +213,6 @@ class SharedState:
         return self._mode
 
     def set_mode(self, new_mode):
-        self.session_setpoint_reached = False
         if new_mode in ["Off", "Manual"]:
             if self._mode == "Session": self.session_start_time = 0
             self._mode = new_mode
@@ -267,8 +263,6 @@ class SharedState:
             self.session_timeout = profile_config['session_timeout']
         if 'session_extend_time' in profile_config:
             self.session_extend_time = profile_config['session_extend_time']
-        if 'session_reset_pid_when_near_setpoint' in profile_config:
-            self.session_reset_pid_when_near_setpoint = profile_config['session_reset_pid_when_near_setpoint']
         if 'temperature_units' in profile_config:
             self.temperature_units = profile_config['temperature_units']
         if 'temperature_setpoint' in profile_config:
@@ -315,6 +309,10 @@ class SharedState:
             self.pid.tunings = self.pid_temperature_tunings  # Update PID tunings immediately
         if 'pid_reset_high_temperature' in profile_config:
             self.pid_reset_high_temperature = profile_config['pid_reset_high_temperature']
+        if 'pid_reset_low_temperature' in profile_config:
+            self.pid_reset_low_temperature = profile_config['pid_reset_low_temperature']
+        if 'pid_reset_i_threshold' in profile_config:
+            self.pid_reset_i_threshold = profile_config['pid_reset_i_threshold']
         if 'autosession_logging_enabled' in profile_config:
             self.autosession_logging_enabled = profile_config['autosession_logging_enabled']
         if 'default_autosession_profile' in profile_config:
@@ -370,7 +368,6 @@ class SharedState:
         return {
             'session_timeout': 7 * 60 * 1000,
             'session_extend_time': 2 * 60 * 1000,
-            'session_reset_pid_when_near_setpoint': True,
             'temperature_units': 'C',
             'temperature_setpoint': 160,
             'control': 'temperature_pid',
@@ -392,6 +389,8 @@ class SharedState:
             'pi_temperature_limit': 60,
             'pid_temperature_tunings': (2.3, 0.03, 0),
             'pid_reset_high_temperature': 15,
+            'pid_reset_low_temperature': 10,
+            'pid_reset_i_threshold': 20,
             'autosession_logging_enabled': False,
             'default_autosession_profile': None,
             'autosession_log_buffer_flush_threshold': 20,

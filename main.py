@@ -290,6 +290,9 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
             shared_state.input_volts,
             heater.get_power(),
             shared_state.watts,
+            shared_state.pid.components[0],
+            shared_state.pid.components[1],
+            shared_state.pid.components[2],
             shared_state.autosession_log_buffer_flush_threshold,
             shared_state.led_blue_pin
         )
@@ -703,33 +706,13 @@ async def async_main():
                     led_blue_pin.on()
                 else:
                     led_blue_pin.off()
-                # Only check setpoint reached in temperature-PID mode
-                if shared_state.control == 'temperature_pid-old':
-                    if shared_state.session_setpoint_reached == False:
-                        if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8):
-                            shared_state.session_setpoint_reached = True
-                            buzzer_play_tone(buzzer, 1500, 350)
-                            if shared_state.session_reset_pid_when_near_setpoint:
-                                shared_state.pid.reset()
-                    else:
-                        if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
-                            shared_state.pid.reset()
 
-               #testing different way to handle this
-                elif shared_state.control == "temperature_pid":   
-                    #need to reset pid if big temp change from setpoint too
-                    if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
-                        shared_state.pid.reset()
-                    # Prevent overshoot by resetting PID if integral is too high while still far from setpoint
-                    elif shared_state.heater_temperature >= (shared_state.temperature_setpoint - 10) and shared_state.pid.components[1] > 20:
-                        shared_state.pid.reset()         
-
-            elif shared_state.get_mode() == "autosession":
+            if shared_state.control == "temperature_pid" or shared_state.control == "autosession":   
                 #need to reset pid if big temp change from setpoint too
                 if shared_state.heater_temperature > (shared_state.temperature_setpoint + shared_state.pid_reset_high_temperature):
                     shared_state.pid.reset()
                 # Prevent overshoot by resetting PID if integral is too high while still far from setpoint
-                elif shared_state.heater_temperature >= (shared_state.temperature_setpoint - 10) and shared_state.pid.components[1] > 20:
+                elif shared_state.heater_temperature >= (shared_state.temperature_setpoint - shared_state.pid_reset_low_temperature) and shared_state.pid.components[1] > shared_state.pid_reset_i_threshold:
                     shared_state.pid.reset()
 
             if enable_watchdog:
