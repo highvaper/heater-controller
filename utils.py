@@ -37,7 +37,7 @@ def create_autosession_log_file(profile_name, autosession_profile_name):
         
         # Create and write header
         f = open(filename, 'w')
-        header = 'elapsed_s,heater_temp_c,setpoint_c,input_volts,power_percent,watts\n'
+        header = 'elapsed_s,heater_temp_c,setpoint_c,input_volts,power_percent,watts,pid_p,pid_i,pid_d\n'
         f.write(header)
         f.flush()
         print(f"Created autosession log: {filename}")
@@ -46,7 +46,7 @@ def create_autosession_log_file(profile_name, autosession_profile_name):
         print(f"Error creating autosession log file: {e}")
         return None, None
 
-def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, temperature_setpoint, input_volts, power_percent, watts, autosession_log_buffer_flush_threshold, led_pin):
+def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, temperature_setpoint, input_volts, power_percent, watts, pid_p, pid_i, pid_d, autosession_log_buffer_flush_threshold, led_pin):
     """
     Buffer autosession data and flush when buffer reaches configured threshold.
     Returns updated buffer and file object (or None if closed).
@@ -56,7 +56,7 @@ def log_autosession_data(log_file, log_buffer, elapsed_ms, heater_temperature, t
             return log_buffer, log_file
         
         elapsed_s = elapsed_ms / 1000.0
-        line = f'{elapsed_s:.1f},{int(heater_temperature)},{int(temperature_setpoint)},{input_volts:.2f},{int(power_percent)},{int(watts)}\n'
+        line = f'{elapsed_s:.1f},{int(heater_temperature)},{int(temperature_setpoint)},{input_volts:.2f},{int(power_percent)},{int(watts)},{pid_p:.4f},{pid_i:.4f},{pid_d:.4f}\n'
         log_buffer.append(line)
         
         # Flush when buffer reaches configured threshold

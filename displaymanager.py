@@ -46,8 +46,8 @@ class DisplayManager:
     async def _heartbeat_task(self, interval_ms=70):
         while True:
             try:
-                # Only draw heartbeat on the home screen and when not in the menu, no errors showing, and temp_max_watts screen not active
-                if (not getattr(self.shared_state, 'in_menu', False)) and (getattr(self.shared_state, 'current_menu_position', 1) == 1) and (not self.shared_state.has_error()) and (not getattr(self.shared_state, 'temp_max_watts_screen_active', False)):
+                # Only draw heartbeat on the home screen and when not in the menu, no errors showing, and temporary_max_watts screen not active
+                if (not getattr(self.shared_state, 'in_menu', False)) and (getattr(self.shared_state, 'current_menu_position', 1) == 1) and (not self.shared_state.has_error()) and (not getattr(self.shared_state, 'temporary_max_watts_screen_active', False)):
                     self.display_heartbeat()
             except Exception:
                 pass
@@ -421,8 +421,8 @@ class DisplayManager:
         self.display.contrast(self.shared_state.display_contrast)  # Set contast to current value
         self.show_standard_screen("Display Contrast",str(self.shared_state.display_contrast))
 
-    def show_screen_temp_max_watts(self):
-        self.show_standard_screen("Temp Max Watts",str(self.shared_state.temp_max_watts) + "W")
+    def show_screen_temporary_max_watts(self):
+        self.show_standard_screen("Temporary Max Watts",str(self.shared_state.temporary_max_watts) + "W")
         
     def show_standard_screen(self,text,value):
         self.display.fill(0)

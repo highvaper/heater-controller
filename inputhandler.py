@@ -93,14 +93,14 @@ class InputHandler:
             self.shared_state.rotary_last_mode = "Display Contrast"
             #print("setup rotarty contrast" + str(self.rotary.value()))
 
-        elif self.shared_state.temp_max_watts_screen_active and self.shared_state.rotary_last_mode != "Temp Max Watts":
-            self.rotary.set(value=self.shared_state.temp_max_watts)
-            self.previous_rotary_value = self.shared_state.temp_max_watts
+        elif self.shared_state.temporary_max_watts_screen_active and self.shared_state.rotary_last_mode != "Temporary Max Watts":
+            self.rotary.set(value=self.shared_state.temporary_max_watts)
+            self.previous_rotary_value = self.shared_state.temporary_max_watts
             self.rotary.set(min_val=0)
             self.rotary.set(max_val=self.shared_state.max_watts)
             self.rotary.set(range_mode=RotaryIRQ.RANGE_BOUNDED)
             self.shared_state.rotary_last_mode = "Temp Max Watts"
-            #print("setup rotary temp_max_watts" + str(self.rotary.value()))
+            #print("setup rotary temporary_max_watts" + str(self.rotary.value()))
 
         elif self.shared_state.rotary_last_mode != "Show Settings" and self.shared_state.menu_options[self.shared_state.current_menu_position] == "Show Settings":
             self.rotary.set(value=self.shared_state.show_settings_line)
@@ -169,10 +169,10 @@ class InputHandler:
                 # Update display contrast
                 self.shared_state.display_contrast = self.rotary.value()
             elif self.shared_state.rotary_last_mode == "Temp Max Watts":
-                # Update temp_max_watts and reset timeout
-                self.shared_state.temp_max_watts = self.rotary.value()
-                self.shared_state.temp_max_watts_start_time = utime.ticks_ms()
-                #print(f"Temp Max Watts updated to: {self.shared_state.temp_max_watts}")
+                # Update temporary_max_watts and reset timeout
+                self.shared_state.temporary_max_watts = self.rotary.value()
+                self.shared_state.temporary_max_watts_start_time = utime.ticks_ms()
+                #print(f"Temporary Max Watts updated to: {self.shared_state.temporary_max_watts}")
             elif self.shared_state.rotary_last_mode == "Show Settings":
                 # Update show settings line
                 self.shared_state.show_settings_line = self.rotary.value()
@@ -311,9 +311,9 @@ class InputHandler:
             #print("Timer finished: Button released")
  
     def check_middle_button_click_count(self, timer):
-        """Handle middle button click detection for temp_max_watts and autosession."""
+        """Handle middle button click detection for temporary_max_watts and autosession."""
         if self.middle_button_click_counter == 1:
-            # Single-click: Show temp_max_watts screen
+            # Single-click: Show temporary_max_watts screen
             if not self.shared_state.in_menu and not self.rotary_used:
                 self.shared_state.middle_button_pressed = True
         

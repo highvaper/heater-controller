@@ -122,7 +122,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
 
     #shared_state.heater_max_duty_cycle_percent - need to update this now and adjust to MAX WATTS (add to shared state)
     if shared_state.input_volts > 0:
-        shared_state.heater_max_duty_cycle_percent = (shared_state.temp_max_watts / (shared_state.input_volts * shared_state.input_volts / shared_state.heater_resistance)) * 100  
+        shared_state.heater_max_duty_cycle_percent = (shared_state.temporary_max_watts / (shared_state.input_volts * shared_state.input_volts / shared_state.heater_resistance)) * 100  
     else:
         shared_state.heater_max_duty_cycle_percent = 100
         
@@ -586,34 +586,34 @@ async def async_main():
             # Check and display any active errors
             if shared_state.has_error():
                 display_manager.show_error()
-            # Check if user clicked middle button to show temp_max_watts screen
+            # Check if user clicked middle button to show temporary_max_watts screen
             elif shared_state.middle_button_pressed:
                 display_manager.stop_home()
                 shared_state.in_menu = False  # Make sure we exit menu mode
-                shared_state.temp_max_watts_screen_active = True
-                shared_state.temp_max_watts_start_time = utime.ticks_ms()
-                shared_state.rotary_last_mode = None  # Reset so setup_rotary_values sets it to "Temp Max Watts"
+                shared_state.temporary_max_watts_screen_active = True
+                shared_state.temporary_max_watts_start_time = utime.ticks_ms()
+                shared_state.rotary_last_mode = None  # Reset so setup_rotary_values sets it to "Temporary Max Watts"
                 input_handler.setup_rotary_values()
-                display_manager.show_screen_temp_max_watts()
+                display_manager.show_screen_temporary_max_watts()
                 shared_state.middle_button_pressed = False
-            # Handle temp_max_watts screen display with timeout
-            elif shared_state.temp_max_watts_screen_active:
+            # Handle temporary_max_watts screen display with timeout
+            elif shared_state.temporary_max_watts_screen_active:
                 # Check if timeout has elapsed (2 seconds with no rotary activity)
-                elapsed = utime.ticks_diff(utime.ticks_ms(), shared_state.temp_max_watts_start_time)
+                elapsed = utime.ticks_diff(utime.ticks_ms(), shared_state.temporary_max_watts_start_time)
                 if elapsed >= 2000:
                     # Timeout - return to home screen
-                    shared_state.temp_max_watts_screen_active = False
+                    shared_state.temporary_max_watts_screen_active = False
                     shared_state.rotary_last_mode = None
                     shared_state.current_menu_position = 1
                 else:
                     # Still displaying - update the screen
-                    display_manager.show_screen_temp_max_watts()
+                    display_manager.show_screen_temporary_max_watts()
             elif not shared_state.in_menu:
                 if shared_state.current_menu_position <= 1:
-                    # ensure rotary values set once (but not if temp_max_watts screen is active)
+                    # ensure rotary values set once (but not if temporary_max_watts screen is active)
                     # Also ensure rotary is reconfigured when autosession starts/stops
                     # Don't reconfigure if we're already in autosession mode with rotary set to autosession
-                    if (shared_state.rotary_last_mode != "setpoint" and shared_state.rotary_last_mode != "autosession" and not shared_state.temp_max_watts_screen_active) or \
+                    if (shared_state.rotary_last_mode != "setpoint" and shared_state.rotary_last_mode != "autosession" and not shared_state.temporary_max_watts_screen_active) or \
                        (shared_state.get_mode() == "autosession" and shared_state.rotary_last_mode != "autosession"):
                         input_handler.setup_rotary_values()
                     shared_state.current_menu_position = 1
