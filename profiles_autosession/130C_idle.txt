@@ -1,0 +1,3 @@
+#Idle at 130C for an hour 
+temperature_profile=0:130,3600:130
+time_adjustment_step=60

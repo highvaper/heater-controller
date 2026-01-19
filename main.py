@@ -702,7 +702,18 @@ async def async_main():
 
             # PID overshoot prevention logic
             if shared_state.get_mode() == "Session":
-                if (shared_state.session_timeout - shared_state.get_session_mode_duration()) > 50000 and (shared_state.session_timeout - shared_state.get_session_mode_duration()) < 60000:
+                remaining_time = shared_state.session_timeout - shared_state.get_session_mode_duration()
+                
+                # Flash blue LED in last 5 seconds
+                if remaining_time <= 5000:
+                    # Flash at approximately 250ms intervals (on for 250ms, off for 250ms)
+                    flash_interval = 250
+                    current_time = utime.ticks_ms()
+                    if (current_time // flash_interval) % 2 == 0:
+                        led_blue_pin.on()
+                    else:
+                        led_blue_pin.off()
+                elif remaining_time > 50000 and remaining_time < 60000:
                     led_blue_pin.on()
                 else:
                     led_blue_pin.off()
