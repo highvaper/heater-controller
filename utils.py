@@ -18,6 +18,31 @@ def set_voltage_divider_adc_pin(pin_number):
     global _voltage_divider_adc_pin
     _voltage_divider_adc_pin = pin_number
 
+def load_hardware_config(filename='hardware.txt'):
+    """Load hardware pin configuration from a text file."""
+    config = {}
+    try:
+        with open(filename, 'r') as f:
+            for line in f:
+                line = line.strip()
+                # Skip empty lines and comments
+                if not line or line.startswith('#'):
+                    continue
+                # Parse key=value pairs
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.split('#')[0].strip()  # Remove inline comments
+                    try:
+                        config[key] = int(value)
+                    except ValueError:
+                        # Store as string if not a valid integer
+                        config[key] = value
+    except Exception as e:
+        print(f"Error loading hardware.txt: {e}")
+        print("Using default pin configuration")
+    return config
+
 
 def create_autosession_log_file(profile_name, autosession_profile_name):
     """

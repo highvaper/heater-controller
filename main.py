@@ -21,36 +21,11 @@ from menusystem import MenuSystem
 
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
-from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles, create_autosession_log_file, log_autosession_data, flush_autosession_log, set_voltage_divider_adc_pin
+from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles, create_autosession_log_file, log_autosession_data, flush_autosession_log, set_voltage_divider_adc_pin, load_hardware_config
 
 
 from shared_state import SharedState
 
-
-# Load hardware pin configuration from hardware.txt
-def load_hardware_config(filename='hardware.txt'):
-    """Load hardware pin configuration from a text file."""
-    config = {}
-    try:
-        with open(filename, 'r') as f:
-            for line in f:
-                line = line.strip()
-                # Skip empty lines and comments
-                if not line or line.startswith('#'):
-                    continue
-                # Parse key=value pairs
-                if '=' in line:
-                    key, value = line.split('=', 1)
-                    key = key.strip()
-                    value = value.split('#')[0].strip()  # Remove inline comments
-                    try:
-                        config[key] = int(value)
-                    except ValueError:
-                        print(f"Warning: Invalid pin number for {key}: {value}")
-    except Exception as e:
-        print(f"Error loading hardware.txt: {e}")
-        print("Using default pin configuration")
-    return config
 
 # Load hardware configuration
 hw = load_hardware_config()
@@ -373,15 +348,7 @@ except Exception as e:
     print("Error initializing LED pin, unable to continue:", e)
     sys.exit()
 
-#Maybe still add an external led - colour one perhaps to indicate above/below/on temp to see from a distance?
-#make special colour for manual vs session?
-#also add buzzer to sound when session about to end as you dont notice 
-#maybe different buzz when first reaches setopoint that session 
 
-
-print("Display Initialising ...")
-display = initialize_display(hardware_pin_display_scl, hardware_pin_display_sda, led_red_pin)
-print("Display initialised.")
 
 shared_state = SharedState(led_red_pin=led_red_pin, led_green_pin=led_green_pin, led_blue_pin=led_blue_pin)
 
@@ -434,16 +401,26 @@ else:
     except OSError:
         print("No /current_autosession_profile.txt found, skipping autosession profile load")
 
-#config = load_config(display)  # need to get config before displaymanager setup perhaps? so if error still need to show user
-#shared_state = SharedState(config)
- 
+
 
 
 
 # DisplayManager
 # Display type options: 'SSD1306_128x32', 'SSD1306_128x64'
-display_type = 'SSD1306_128x32'  #move to shared state and load/save with config later
-                                 #not in porfiles maybe better in hardware.conf
+display_type = hw.get('display_type', 'SSD1306_128x32')
+
+print("Display Initialising ...")
+if display_type in 'SSD1306_128x32,SSD1306_128x64':
+    display = initialize_display(hardware_pin_display_scl, hardware_pin_display_sda, led_red_pin)
+else:
+    error_text = "Display init failed - unknown display type: " + str(display_type)
+    print(error_text)   
+    while True: 
+
+        utime.sleep_ms(100)
+print("Display initialised.")
+
+
 try:
     display_manager = DisplayManagerFactory.create_display_manager(display_type, display, shared_state)
     # startup screen will be scheduled from async_main so it doesn't block here
