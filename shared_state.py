@@ -1,4 +1,5 @@
 import utime
+from collections import deque
 from simple_pid import PID
 
 class SharedState:
@@ -6,6 +7,9 @@ class SharedState:
         self.led_red_pin = led_red_pin
         self.led_green_pin = led_green_pin
         self.led_blue_pin = led_blue_pin
+        
+        # Display width - will be set after display initialization based on actual display
+        self.display_width = 128  # Default for SSD1306, can be updated later
         
         self.temperature_units = 'C'       # Not tested F at all 
         
@@ -91,22 +95,18 @@ class SharedState:
         
 
         # below are controlled by internal processes dont mess with 
-        #self.temperature_readings =  {i: 20 for i in range(128)}
-        self.temperature_readings =  {}
+        # Using deque with maxlen as ring buffers - automatically removes oldest when full
+        # maxlen matches display width so each reading = one pixel column on graphs
+        # Note: These will be re-initialized after display setup with correct width
+        self.temperature_readings = deque([], self.display_width)  # Stores temperature values
         self.heater_temperature = 0  # Overal heater temperature from thermocouple at the moment only deals with one 
                                      # possibly extend to deal with multpile but not to start with
 
-        self.input_volts_readings = {}  #need to add volt graph
+        self.input_volts_readings = deque([], self.display_width)  # Stores voltage values
         self.input_volts = 0
         
-        self.watt_readings = {}
+        self.watt_readings = deque([], self.display_width)  # Stores watt values
         self.watts = 0
-        
-        # Cache min/max time values for display optimization
-        self.temperature_min_time = 0
-        self.temperature_max_time = 0
-        self.watt_min_time = 0
-        self.watt_max_time = 0
         
         self.pi_temperature = 0         # PI Pico chip temperature
         self.pi_temperature_limit = 60  # Maybe place pico board above/next to mosfet module so we get some idea hot its getting 

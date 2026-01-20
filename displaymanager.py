@@ -190,29 +190,25 @@ class DisplayManager:
             return
         
         # Calculate min and max temperatures once
-        min_temp = min(temperature_readings.values())
-        max_temp = max(temperature_readings.values())
+        min_temp = min(temperature_readings)
+        max_temp = max(temperature_readings)
         temp_range = max_temp - min_temp
         if temp_range == 0: temp_range = 1
         display_height = self.display_height
 
-        # Use cached min and max times
-        min_time = self.shared_state.temperature_min_time
-        max_time = self.shared_state.temperature_max_time
-        x_range = max_time - min_time
-        if x_range == 0: x_range = 1
-        
-        x_scale = self.display_width / x_range
+        # Scale based on number of readings
+        x_scale = self.display_width / len(temperature_readings)
         y_scale = display_height / temp_range
 
-        for time, temp in temperature_readings.items():
-            x = int((time - min_time) * x_scale)
+        for i, temp in enumerate(temperature_readings):
+            x = int(i * x_scale)
             y = display_height - int((temp - min_temp) * y_scale)
 
             # Draw a rectangle for each temperature reading
             self.display.fill_rect(x, y, 1, int(temp * y_scale), 1)
 
-        last_time, last_temp = max(temperature_readings.items(), key=lambda item: item[0])
+        # Last reading is at the end of deque
+        last_temp = temperature_readings[-1]
 
         #last_temp_str = f"{last_temp:.1f}" # Adjust the precision as needed
         last_temp_str = str(last_temp) + "C"
@@ -242,21 +238,17 @@ class DisplayManager:
             self.display.show()
             return
 
-        min_time = self.shared_state.temperature_min_time
-        max_time = self.shared_state.temperature_max_time
-        x_range = max_time - min_time
-        if x_range == 0: x_range = 1
+        x_scale = self.display_width / len(temperature_readings)
 
-        x_scale = self.display_width / x_range
-
-        for time, temp in temperature_readings.items():
-            x = int((time - min_time) * x_scale)
+        for i, temp in enumerate(temperature_readings):
+            x = int(i * x_scale)
             y = self.display_height - int(temp / 10) # Adjust the y-coordinate to represent each pixel as 10°C
 
             # Draw a single pixel for each temperature reading
             self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
 
-        last_time, last_temp = max(temperature_readings.items(), key=lambda item: item[0])
+        # Last reading is at the end of deque
+        last_temp = temperature_readings[-1]
         last_temp_str = str(last_temp) + "C"
 
         # Draw dotted setpoint line
@@ -289,8 +281,9 @@ class DisplayManager:
 
         setpoint_y = display_height // 2 # Setpoint is in the middle of the screen
 
-        for time, temp in temperature_readings.items():
-            x = int((time - self.shared_state.temperature_min_time) * (self.display_width / (self.shared_state.temperature_max_time - self.shared_state.temperature_min_time)))
+        x_scale = self.display_width / len(temperature_readings) if temperature_readings else 1
+        for i, temp in enumerate(temperature_readings):
+            x = int(i * x_scale)
             # Calculate the y-coordinate relative to the setpoint
             y = int(setpoint_y + (temp - setpoint) * -1)
             # Ensure y-coordinate does not go below 0 or above the display height
@@ -310,7 +303,8 @@ class DisplayManager:
 #        for x in range(0, self.display.width, dot_spacing):
 #            self.display.pixel(x, setpoint_y, 1)
 
-        last_time, last_temp = max(temperature_readings.items(), key=lambda item: item[0])
+        # Last reading is at the end of deque
+        last_temp = temperature_readings[-1] if temperature_readings else 0
         t = str(last_temp) + "C"
 
         # Now have an LED to indicate we are in session/manual mode so lets save screen space
@@ -340,40 +334,31 @@ class DisplayManager:
             self.display.show()
             return
 
-        watt_min_time = self.shared_state.watt_min_time
-        watt_max_time = self.shared_state.watt_max_time
-        x_range = watt_max_time - watt_min_time
-        if x_range == 0: x_range = 1
-
-        x_scale = self.display_width / x_range
+        x_scale = self.display_width / len(watt_readings)
         y_scale = self.shared_state.max_watts / self.display_height
-        for time, watt in watt_readings.items():
-            x = int((time - watt_min_time) * x_scale)
+        for i, watt in enumerate(watt_readings):
+            x = int(i * x_scale)
             y = self.display_height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
 
             # Draw a single pixel for each watt reading
             self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
 
-        last_time, last_watt = max(watt_readings.items(), key=lambda item: item[0])
+        # Last reading is at the end of deque
+        last_watt = watt_readings[-1]
         last_watts_str = str(last_watt) + "W"
 
+        x_scale = self.display_width / len(temperature_readings)
 
-        temp_min_time = self.shared_state.temperature_min_time
-        temp_max_time = self.shared_state.temperature_max_time
-        x_range = temp_max_time - temp_min_time
-        if x_range == 0: x_range = 1
-
-        x_scale = self.display_width / x_range
-
-        for time, temp in temperature_readings.items():
-            x = int((time - temp_min_time) * x_scale)
+        for i, temp in enumerate(temperature_readings):
+            x = int(i * x_scale)
             y = self.display_height - int(temp / 10) # Adjust the y-coordinate to represent each pixel as 10°C
 
             # Draw a dotted line
             if(x % 2) == 0:
                 self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
 
-        last_time, last_temp = max(temperature_readings.items(), key=lambda item: item[0])
+        # Last reading is at the end of deque
+        last_temp = temperature_readings[-1]
         last_temp_str = str(last_temp) + "C"
 
         # Draw dotted setpoint line
@@ -397,21 +382,17 @@ class DisplayManager:
             self.display.show()
             return
 
-        min_time = self.shared_state.watt_min_time
-        max_time = self.shared_state.watt_max_time
-        x_range = max_time - min_time
-        if x_range == 0: x_range = 1
-
-        x_scale = self.display_width / x_range
+        x_scale = self.display_width / len(watt_readings)
         y_scale = self.shared_state.max_watts / self.display_height
-        for time, watt in watt_readings.items():
-            x = int((time - min_time) * x_scale)
+        for i, watt in enumerate(watt_readings):
+            x = int(i * x_scale)
             y = self.display_height - int(watt / y_scale) # Adjust the y-coordinate to represent each pixel as 10W
 
             # Draw a single pixel for each watt reading
             self.display.pixel(x, y, 1) # Assuming 1 is the color for the pixel
 
-        last_time, last_watt = max(watt_readings.items(), key=lambda item: item[0])
+        # Last reading is at the end of deque
+        last_watt = watt_readings[-1]
         last_watts_str = str(last_watt) + "W"
 
         # Draw dotted setpoint line

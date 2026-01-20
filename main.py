@@ -2,7 +2,7 @@
 import utime
 import sys
 
-
+from collections import deque
 
 import machine
 from machine import ADC, Pin, I2C, Timer, WDT, PWM
@@ -133,40 +133,19 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         # new off temperature is valid
         shared_state.heater_temperature = new_heater_temperature
 
-    if len(shared_state.temperature_readings) >= 128: 
-        oldest_time = min(shared_state.temperature_readings.keys())
-        del shared_state.temperature_readings[oldest_time]
-    shared_state.temperature_readings[utime.ticks_ms()] = int(shared_state.heater_temperature)
-    
-    # Cache min/max for display optimization
-    if shared_state.temperature_readings:
-        shared_state.temperature_min_time = min(shared_state.temperature_readings.keys())
-        shared_state.temperature_max_time = max(shared_state.temperature_readings.keys())
+    # Append to ring buffer - automatically removes oldest when full
+    shared_state.temperature_readings.append(int(shared_state.heater_temperature))
+    shared_state.input_volts_readings.append(shared_state.input_volts)
 
-    if len(shared_state.input_volts_readings) >= 128: 
-        oldest_time = min(shared_state.input_volts_readings.keys())
-        del shared_state.input_volts_readings[oldest_time]
-    shared_state.input_volts_readings[utime.ticks_ms()] = shared_state.input_volts
-
-
-
-    if len(shared_state.watt_readings) >= 128: 
-        oldest_time = min(shared_state.watt_readings.keys())
-        del shared_state.watt_readings[oldest_time]
-    
+    # Calculate watts and append to ring buffer
     if heater.is_on():
         # Calculate actual watts from voltage, resistance, and actual duty cycle
         # Don't use heater_max_duty_cycle_percent as that's a safety limit, not the actual power
         shared_state.watts = int((((shared_state.input_volts*shared_state.input_volts) / shared_state.heater_resistance) * (heater.get_power() / 100)))
-        shared_state.watt_readings[utime.ticks_ms()] = shared_state.watts
     else:
         shared_state.watts = 0
-        shared_state.watt_readings[utime.ticks_ms()] = 0
     
-    # Cache min/max for display optimization
-    if shared_state.watt_readings:
-        shared_state.watt_min_time = min(shared_state.watt_readings.keys())
-        shared_state.watt_max_time = max(shared_state.watt_readings.keys())
+    shared_state.watt_readings.append(shared_state.watts)
 
     # Check if autosession is active and update setpoint if needed
     if shared_state.get_mode() == "autosession" and shared_state.autosession_profile:
@@ -423,6 +402,11 @@ print("Display initialised.")
 
 try:
     display_manager = DisplayManagerFactory.create_display_manager(display_type, display, shared_state)
+    # Update shared_state with actual display width and reinitialize ring buffers
+    shared_state.display_width = display.width
+    shared_state.temperature_readings = deque([], shared_state.display_width)   #  shared_state.display_width * 2 etc to get more data on graphs 
+    shared_state.input_volts_readings = deque([], shared_state.display_width)   #  maybe make this adjustable later in profile
+    shared_state.watt_readings = deque([], shared_state.display_width)
     # startup screen will be scheduled from async_main so it doesn't block here
 except Exception as e:
     error_text = "Start up failed - [display-setup] " + shared_state.error_messages["display-setup"] + " " + str(e)
@@ -534,7 +518,7 @@ while shared_state.input_volts is False:
 # Create heater based on heater_type in shared_state
 if shared_state.heater_type == 'induction':
     # InductionHeater requires timer and coil pins
-    # Coil pins would need to be defined in hardware.txt, using defaults for now
+    # Coil pins need to be defined in hardware.txt, using defaults for now
     ihTimer = CustomTimer(-1, machine.Timer.PERIODIC, lambda t: None)  # Timer for coil switching
     heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
 else:
