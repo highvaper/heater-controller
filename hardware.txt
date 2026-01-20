@@ -1,0 +1,36 @@
+# Hardware Pin Configuration
+# Edit pin numbers to match your hardware setup
+# Format: pin_name = pin_number
+
+# LED Pins
+red_led = 17
+green_led = 18
+blue_led = 19
+
+# Display Pins (I2C)
+display_scl = 21
+display_sda = 20
+
+# Buzzer
+buzzer = 16
+
+# Rotary Encoder
+rotary_clk = 13
+rotary_dt = 12
+button = 14
+
+# Switches
+switch_left = 23
+switch_middle = 24
+switch_right = 25
+
+# Thermocouple (MAX6675)
+thermocouple_sck = 6
+thermocouple_cs = 7
+thermocouple_so = 8
+
+# Heater Control
+heater = 22
+
+# Voltage Monitoring (ADC)
+voltage_adc = 28

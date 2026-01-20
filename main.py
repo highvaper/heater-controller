@@ -21,49 +21,67 @@ from menusystem import MenuSystem
 
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
-from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles, create_autosession_log_file, log_autosession_data, flush_autosession_log
+from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles, create_autosession_log_file, log_autosession_data, flush_autosession_log, set_voltage_divider_adc_pin
 
 
 from shared_state import SharedState
 
 
-#Need to get input voltage measured so we can possibly set an upper limit 
-#eg:
-#24v 0.6ohm 40amp 960w  5%-8%  (50-80w)
-#12v 0.6ohm 20amp 240w  25-33% (60-80w)
-# 9v 0.6ohm 15amp 135w  45-60% (60-80w)
-# 6v 0.6ohm 10amp  60w  100%   (60w)
+# Load hardware pin configuration from hardware.txt
+def load_hardware_config(filename='hardware.txt'):
+    """Load hardware pin configuration from a text file."""
+    config = {}
+    try:
+        with open(filename, 'r') as f:
+            for line in f:
+                line = line.strip()
+                # Skip empty lines and comments
+                if not line or line.startswith('#'):
+                    continue
+                # Parse key=value pairs
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.split('#')[0].strip()  # Remove inline comments
+                    try:
+                        config[key] = int(value)
+                    except ValueError:
+                        print(f"Warning: Invalid pin number for {key}: {value}")
+    except Exception as e:
+        print(f"Error loading hardware.txt: {e}")
+        print("Using default pin configuration")
+    return config
 
+# Load hardware configuration
+hw = load_hardware_config()
 
-#Note if we can get input voltage for coil then we can possibly set some sensible default for heater_max_duty_cycle_percent
-#also choose the correct profile automatically - ie know its battery or mains - get user to confirm  
-# - ie to then enable/diable battery check and also et preset pid values for each battery setup type or mains from profile
+# Pin assignments (with fallback defaults if hardware.txt is missing)
+hardware_pin_red_led = hw.get('red_led', 17)
+hardware_pin_green_led = hw.get('green_led', 18)
+hardware_pin_blue_led = hw.get('blue_led', 19)
 
+hardware_pin_display_scl = hw.get('display_scl', 21)
+hardware_pin_display_sda = hw.get('display_sda', 20)
 
+hardware_pin_buzzer = hw.get('buzzer', 16)
 
-hardware_pin_red_led = 17   # indicate within 10C of setemp in session mode
-hardware_pin_green_led = 18 # indicate heater (manual or session) is activated 
-hardware_pin_blue_led = 19  # indicate at start of last minute of a session
+hardware_pin_rotary_clk = hw.get('rotary_clk', 13)
+hardware_pin_rotary_dt = hw.get('rotary_dt', 12)
+hardware_pin_button = hw.get('button', 14)
 
-hardware_pin_display_scl = 21
-hardware_pin_display_sda = 20
+hardware_pin_switch_left = hw.get('switch_left', 23)
+hardware_pin_switch_middle = hw.get('switch_middle', 24)
+hardware_pin_switch_right = hw.get('switch_right', 25)
 
-hardware_pin_buzzer = 16
+hardware_pin_termocouple_sck = hw.get('thermocouple_sck', 6)
+hardware_pin_termocouple_cs = hw.get('thermocouple_cs', 7)
+hardware_pin_termocouple_so = hw.get('thermocouple_so', 8)
 
-hardware_pin_rotary_clk = 13
-hardware_pin_rotary_dt = 12
-hardware_pin_button = 14  #can also be a separate button as well as rotary push/sw pin 
+hardware_pin_heater = hw.get('heater', 22)
+hardware_pin_voltage_divider_adc = hw.get('voltage_divider_adc', 28)
 
-hardware_pin_switch_left = 23    #down 
-hardware_pin_switch_middle = 24  #select  - on boot hold to disable watchdog
-hardware_pin_switch_right = 25   #up
-
-hardware_pin_termocouple_sck = 6
-hardware_pin_termocouple_cs = 7 
-hardware_pin_termocouple_so = 8
-
-hardware_pin_heater = 22
-
+# Configure global hardware pins in utils module
+set_voltage_divider_adc_pin(hardware_pin_voltage_divider_adc)
 
 
 ####################################

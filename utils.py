@@ -10,6 +10,14 @@ from machine import ADC
 
 from autosession import AutoSessionTemperatureProfile
 
+# Hardware pin configuration
+_voltage_divider_adc_pin = 28  # Default value
+
+def set_voltage_divider_adc_pin(pin_number):
+    """Set the ADC pin number for voltage divider monitoring."""
+    global _voltage_divider_adc_pin
+    _voltage_divider_adc_pin = pin_number
+
 
 def create_autosession_log_file(profile_name, autosession_profile_name):
     """
@@ -418,7 +426,7 @@ def initialize_display(i2c_scl, i2c_sda, led_pin):
 
 
 def get_input_volts(previous_reading):
-    adc_pin = ADC(28)
+    adc_pin = ADC(_voltage_divider_adc_pin)
     r1 = 910000   # 910kΩ
     r2 = 102000   # 102kΩ
     adc_value = adc_pin.read_u16()
