@@ -15,7 +15,7 @@ from simple_pid import PID
 
 from customtimer import CustomTimer
 from thermocouple import Thermocouple
-from displaymanager import DisplayManager
+from displaymanager import DisplayManagerFactory
 from inputhandler import InputHandler
 from menusystem import MenuSystem
 
@@ -212,7 +212,10 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
             shared_state.set_mode("Off")
 
     if shared_state.control == 'temperature_pid' or shared_state.control == 'autosession':
-        power = shared_state.pid(shared_state.heater_temperature)  # Update pid even if heater is off
+        if shared_state.heater_temperature is not None:
+            power = shared_state.pid(shared_state.heater_temperature)  # Update pid even if heater is off
+        else:
+            power = 0  # No valid temperature, stay off
     elif shared_state.control == 'duty_cycle':
         power = shared_state.set_duty_cycle  # Use duty cycle directly (0-100%)
     else:
@@ -438,8 +441,11 @@ else:
 
 
 # DisplayManager
+# Display type options: 'SSD1306_128x32', 'SSD1306_128x64'
+display_type = 'SSD1306_128x32'  #move to shared state and load/save with config later
+                                 #not in porfiles maybe better in hardware.conf
 try:
-    display_manager = DisplayManager(display, shared_state)
+    display_manager = DisplayManagerFactory.create_display_manager(display_type, display, shared_state)
     # startup screen will be scheduled from async_main so it doesn't block here
 except Exception as e:
     error_text = "Start up failed - [display-setup] " + shared_state.error_messages["display-setup"] + " " + str(e)
@@ -687,7 +693,7 @@ async def async_main():
                     pass
             
             # LED status updates (safe to always execute)
-            if shared_state.heater_temperature >= (shared_state.temperature_setpoint-8) and shared_state.heater_temperature <= (shared_state.temperature_setpoint+8):
+            if shared_state.heater_temperature is not None and shared_state.heater_temperature >= (shared_state.temperature_setpoint-8) and shared_state.heater_temperature <= (shared_state.temperature_setpoint+8):
                 led_red_pin.on()
             else:
                 led_red_pin.off()
@@ -720,19 +726,22 @@ async def async_main():
 
             # PID overshoot prevention logic
             if shared_state.get_mode() == "Session":
-                remaining_time = shared_state.session_timeout - shared_state.get_session_mode_duration()
-                
-                # Flash blue LED in last 5 seconds
-                if remaining_time <= 5000:
-                    # Flash at approximately 250ms intervals (on for 250ms, off for 250ms)
-                    flash_interval = 250
-                    current_time = utime.ticks_ms()
-                    if (current_time // flash_interval) % 2 == 0:
+                if shared_state.session_timeout is not None and shared_state.session_timeout > 0:
+                    remaining_time = shared_state.session_timeout - shared_state.get_session_mode_duration()
+                    
+                    # Flash blue LED in last 5 seconds
+                    if remaining_time <= 5000:
+                        # Flash at approximately 250ms intervals (on for 250ms, off for 250ms)
+                        flash_interval = 250
+                        current_time = utime.ticks_ms()
+                        if (current_time // flash_interval) % 2 == 0:
+                            led_blue_pin.on()
+                        else:
+                            led_blue_pin.off()
+                    elif remaining_time > 50000 and remaining_time < 60000:
                         led_blue_pin.on()
                     else:
                         led_blue_pin.off()
-                elif remaining_time > 50000 and remaining_time < 60000:
-                    led_blue_pin.on()
                 else:
                     led_blue_pin.off()
 
@@ -752,8 +761,12 @@ async def async_main():
         
         except Exception as e:
             print(f"Error in main loop: {e}")
-            import traceback
-            traceback.print_exc()
+            # Don't import traceback in MicroPython - it may not be available
+            try:
+                import sys
+                sys.print_exception(e)
+            except:
+                pass
         
         await asyncio.sleep_ms(70)
 
