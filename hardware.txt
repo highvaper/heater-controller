@@ -33,4 +33,4 @@ thermocouple_so = 8
 heater = 22
 
 # Voltage Monitoring (ADC)
-voltage_adc = 28
+voltage_divider_adc = 28
