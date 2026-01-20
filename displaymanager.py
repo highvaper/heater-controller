@@ -143,6 +143,23 @@ class DisplayManager:
         self.display.show()
         utime.sleep_ms(2000) # Wait for 2 seconds to display the first set of messages
 
+    def show_low_disk_space_screen(self, free_kb):
+        # Flash the low disk space warning
+        for _ in range(6):  # Flash 5 times
+            # Show warning
+            self.display.fill(0)
+            self.display.text('Warning',  self.get_centered_text_start_position('Warning'), 0, 1)
+            self.display.text('Low Disk', self.get_centered_text_start_position('Low Disk'), 8, 1)
+            free_text = str(int(free_kb)) + 'KB'
+            self.display.text(free_text, self.get_centered_text_start_position(free_text), 16, 1)
+            self.display.show()
+            utime.sleep_ms(1500)
+            
+            # Clear screen
+            self.display.fill(0)
+            self.display.show()
+            utime.sleep_ms(800)
+
     def show_error(self):
         """Display current error on screen."""
         if not self.shared_state.has_error():

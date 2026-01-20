@@ -18,6 +18,29 @@ def set_voltage_divider_adc_pin(pin_number):
     global _voltage_divider_adc_pin
     _voltage_divider_adc_pin = pin_number
 
+def check_disk_space(display_manager, buzzer, threshold_kb=200):
+    """Check free disk space and alert if below threshold."""
+    try:
+        stat = os.statvfs('/')
+        # f_bsize = block size, f_bavail = available blocks
+        free_kb = (stat[0] * stat[4]) / 1024
+        print(f"Free disk space: {int(free_kb)}KB")
+        
+        if free_kb < threshold_kb:
+            # Play warning beeps
+            buzzer_play_tone(buzzer, 1500, 300)
+            utime.sleep_ms(100)
+            buzzer_play_tone(buzzer, 1500, 300)
+            
+            # Show warning on display
+            display_manager.show_low_disk_space_screen(free_kb)
+            print(f"Warning: Low disk space - {int(free_kb)}KB remaining")
+        
+        return free_kb
+    except Exception as e:
+        print(f"Could not check disk space: {e}")
+        return None
+
 def load_hardware_config(filename='hardware.txt'):
     """Load hardware pin configuration from a text file."""
     config = {}

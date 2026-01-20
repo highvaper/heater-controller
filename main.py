@@ -21,7 +21,7 @@ from menusystem import MenuSystem
 
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
-from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles, create_autosession_log_file, log_autosession_data, flush_autosession_log, set_voltage_divider_adc_pin, load_hardware_config
+from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles, create_autosession_log_file, log_autosession_data, flush_autosession_log, set_voltage_divider_adc_pin, load_hardware_config, check_disk_space
 
 
 from shared_state import SharedState
@@ -429,6 +429,8 @@ buzzer = PWM(Pin(hardware_pin_buzzer))
 buzzer_play_tone(buzzer, 2500, 200)  # Play a sound so we know its connected correctly
 print("Buzzer initialised.")
 
+# Check disk space
+_ = check_disk_space(display_manager, buzzer)
 
 #button_pin = Pin(hardware_pin_button, Pin.IN)
 button_pin = Pin(hardware_pin_switch_middle, Pin.IN, Pin.PULL_UP)
