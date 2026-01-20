@@ -14,6 +14,8 @@ A MicroPython-based heater controller with PID control for temperature regulatio
 - LED status indicators
 - Watchdog support for hardware safety
 
+For detailed installation instructions, see [INSTALL.md](INSTALL.md).
+
 ## Required Hardware
 
 - Raspberry Pi Pico
@@ -64,14 +66,6 @@ For element heater
 Note: This diagram excludes any power connections.
 
 
-## Install Notes
-
-First set up Pi Pico with MicroPython in Thonny.
-
-https://www.raspberrypi.com/documentation/microcontrollers/micropython.html
-
-https://thonny.org/
-
 
 ## Operating Modes
 
@@ -121,7 +115,7 @@ https://thonny.org/
 - Middle button
  - **Single Click**: Display/adjust Temp Max Watts.
  - **Triple Click**: Start/stop an AutoSession
-
+ - **Quadruple Click (4x fast)**: If AutoSession in progress will switch to normal sesson mode and start a new session
 - If you depress the encoder while turning it will increase/decrease the value in x10 increments (not in Auto Session)
 
 - Change mode switch cycles through the modes
@@ -137,22 +131,38 @@ https://thonny.org/
 - **Blue LED**: Indicates near end of session.
 
 
-## Usage
 
-1. Connect all hardware as described above.
-2. Upload all `.py` files and the `lib/` folder to the Pico.
-3. Run `main.py`.
-4. Use the rotary encoder and switches to navigate menus and set temperature or power.
-5. Monitor status via the OLED display and LEDs.
-
-
-## Upload files from repository
-
-In Thonny, use the `Tools` > `Upload Files` option.
-
-For development or testing, it's simpler to copy and paste the contents of `main.py` directly into the interpreter window rather than copying the file itself.
 
 ## Safety Notes
 
 - Always verify correct wiring before powering the heater.
 - Set appropriate resistance and wattage limits for your coil/element.
+
+
+## Hardware Testing
+
+```python
+import test_hardware
+
+# Run all tests
+test_hardware.test_hardware()
+
+# Run specific tests
+test_hardware.test_hardware('leds')          # Test RGB LEDs
+test_hardware.test_hardware('buzzer')        # Test buzzer
+test_hardware.test_hardware('display')       # Test OLED display
+test_hardware.test_hardware('thermocouple')  # Test MAX6675
+test_hardware.test_hardware('rotary')        # Test rotary encoder
+test_hardware.test_hardware('switches')      # Test push buttons
+test_hardware.test_hardware('adc')           # Test voltage monitoring
+test_hardware.test_hardware('heater')        # Test heater output (WARNING: activates heater!)
+
+# Run multiple tests
+test_hardware.test_hardware('leds', 'display', 'thermocouple')
+```
+
+The test suite will:
+- Read your `hardware.txt` configuration
+- Test each component systematically
+- Report PASSED/FAILED/SKIPPED for each test
+- Provide visual and interactive feedback

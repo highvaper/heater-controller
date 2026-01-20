@@ -26,6 +26,11 @@ set_watts=30
 set_duty_cycle=10.0
 
 # ===== HEATER CONFIGURATION =====
+# Heater type: string ('element' or 'induction')
+# - 'element' uses resistive heating element with PWM control (default)
+# - 'induction' uses induction coils with coil switching
+heater_type=element
+
 # Heater coil/element resistance in ohms: float
 heater_resitance=0.49
 
@@ -33,12 +38,10 @@ heater_resitance=0.49
 # Safety limit to prevent coil from overheating/glowing
 max_watts=75
 
-# Temperature difference threshold for induction heaters: int (degrees)
-# Used to filter readings when induction heater is on
-heater_on_temperature_difference_threshold=20
 
 # ===== POWER THRESHOLDS =====
 # Power threshold for control adjustments: int
+# between pid.output_limits range (1-100)
 power_threshold=0
 
 # ===== POWER CONFIGURATION =====

@@ -223,6 +223,11 @@ def load_profile(profile_name, shared_state):
                                     config[key] = value
                                 else:
                                     print(f"Warning: control mode must be 'temperature_pid', 'watts', or 'duty_cycle': {value}")
+                            elif key in ['heater_type']:
+                                if value in ['element', 'induction']:
+                                    config[key] = value
+                                else:
+                                    print(f"Warning: heater_type must be 'element' or 'induction': {value}")
                             elif key in ['power_type']:
                                 if value in ['mains', 'lipo', 'lead']:
                                     config[key] = value

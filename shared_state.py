@@ -32,7 +32,9 @@ class SharedState:
         self.lead_safe_volts = 12.0 
         self.mains_safe_volts = 28.0 
 
-        self.heater_resistance = 0.49  #this should not change unless coils is replaced user needs to provide this value
+        self.heater_resistance = 0.49 # Ohms - need to set this correctly for the heater coil being used
+
+        self.heater_type = 'element'  # Heater type: 'element' or 'induction' 
 
         self.heater_too_hot = False  # State variable for temperature over-limit hysteresis (250C turn on, 240C turn off)
 
@@ -67,7 +69,7 @@ class SharedState:
         # need to check on max temp and how long its been above 250?  re Ptfe insulation and not keeping it too ig for too long 
         # maybe have a timer for this?
 
-        #self.power_threshold = 5  #between pid.output_limits range (1-10)
+        #self.power_threshold = 5  #between pid.output_limits range (1-100)
         self.power_threshold = 0 #for slower sensors like DS18X20 probally lower is better 
                 
         # for the filtered tempterature when induction is on 
@@ -412,6 +414,7 @@ class SharedState:
             'mains_safe_volts': 28.0,
             'power_threshold': 0,
             'heater_on_temperature_difference_threshold': 20,
+            'heater_type': 'element',
             'max_watts': 25, #Set this low for startup
             'heater_resistance': 0.35,  #Set this low so that max_duty_cycle is not too high at startup
             'display_contrast': 255,

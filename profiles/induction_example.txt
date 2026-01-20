@@ -1,0 +1,26 @@
+# Example Profile - Induction Heater Setup
+# When loaded, missing values will use defaults from shared_state
+
+temperature_setpoint=190
+
+# Heater type: string ('element' or 'induction')
+# - 'element' uses resistive heating element with PWM control (default)
+# - 'induction' uses induction coils with coil switching
+heater_type=induction
+
+
+# PID tuning for this specific heater setup (P,I,D)
+# need to update
+pid_temperature_tunings = 1,0,0
+
+
+# Temperature difference threshold for induction heaters: int (degrees)
+# Used to filter readings when induction heater is on
+heater_on_temperature_difference_threshold=20
+
+
+# Degrees above setpoint at which PID will be reset if temperature spikes after reaching setpoint
+pid_reset_high_temperature=10
+
+# Minimum power before heater will be switched on
+power_threshold=10   

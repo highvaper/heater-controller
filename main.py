@@ -531,12 +531,15 @@ while shared_state.input_volts is False:
 #warn user if high but still not ridiculous
 #reduce if too high to more sensible level
 
-# InductionHeater
-#ihTimer = Timer(-1) # need to replace with CustomTimer 
-#heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
-
-heater = HeaterFactory.create_heater('element', hardware_pin_heater)   # changing the limit will mess with PID tuning
-
+# Create heater based on heater_type in shared_state
+if shared_state.heater_type == 'induction':
+    # InductionHeater requires timer and coil pins
+    # Coil pins would need to be defined in hardware.txt, using defaults for now
+    ihTimer = CustomTimer(-1, machine.Timer.PERIODIC, lambda t: None)  # Timer for coil switching
+    heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
+else:
+    # ElementHeater (default)
+    heater = HeaterFactory.create_heater('element', hardware_pin_heater)
 
 heater.off()
 
