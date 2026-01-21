@@ -10,6 +10,7 @@
 
 ### Step 2: Flash MicroPython (if not already done)
 
+**Using Thonny (Easiest):**
 1. Connect your device while holding the BOOTSEL button
 2. In Thonny, go to **Tools > Options > Interpreter**
 3. Select **MicroPython (Raspberry Pi Pico)**
@@ -17,6 +18,8 @@
 5. Select your device from the device list
 6. Click **Install** and wait for completion
 7. The device will reboot with MicroPython
+
+**Alternative Methods:** If you prefer not to use Thonny or want to use command-line tools, see the [Flashing MicroPython](#flashing-micropython-all-platforms) section below for detailed instructions for all platforms.
 
 ### Step 3: Connect to Your Device
 
@@ -185,3 +188,185 @@ Simply reset the device without holding any button, and the watchdog will be ena
 - **Add new profile** → Create `.txt` file, upload to `/profiles/` or `/profiles_autosession/`
 
 **Tip:** After uploading profiles, you don't need to restart - they're loaded on-demand from the menu
+
+---
+
+## Alternative Installation Methods
+
+### Using mpremote (Mac, Linux, Windows with Python)
+
+If you have Python installed, you can use `mpremote` instead of Thonny for flashing and file management.
+
+#### Step 1: Install mpremote
+
+```bash
+pip install mpremote
+```
+
+Or on some systems:
+```bash
+pip3 install mpremote
+```
+
+#### Step 2: Flash MicroPython Firmware
+
+If you haven't flashed MicroPython yet, see the [Flashing MicroPython](#flashing-micropython-all-platforms) section below for detailed instructions on how to install the firmware on your device.
+
+#### Step 3: Test mpremote Connection
+
+```bash
+mpremote connect list
+```
+
+This shows available devices. Then connect:
+
+```bash
+mpremote
+```
+
+You should see the MicroPython REPL prompt `>>>`
+
+#### Step 4: Copy Files to Device
+
+**Copy all files at once:**
+
+```bash
+# Navigate to your heater-controller folder first
+cd /path/to/heater-controller
+
+# Copy all Python files
+mpremote cp *.py :
+
+# Copy lib folder
+mpremote cp -r lib :
+
+# Copy profile folders
+mpremote cp -r profiles :
+mpremote cp -r profiles_autosession :
+
+# Copy hardware profile folder
+mpremote cp -r hardware_profiles :
+
+# Copy display drivers folder
+mpremote cp -r displaydrivers :
+
+# Copy configuration files
+mpremote cp hardware_default.txt :
+```
+
+**Or copy everything in one command:**
+
+```bash
+mpremote cp -r . :
+```
+
+#### Step 5: Run and Test
+
+**Run the test script:**
+```bash
+mpremote exec "import test_hardware; test_hardware.test_hardware()"
+```
+
+**Run main:**
+```bash
+mpremote exec "import main"
+```
+
+**Reset the device:**
+```bash
+mpremote reset
+```
+
+#### Step 6: Update Files
+
+To update a single file:
+```bash
+mpremote cp main.py :
+```
+
+To update a profile:
+```bash
+mpremote cp profiles/my_profile.txt :profiles/
+```
+
+**Useful mpremote commands:**
+
+```bash
+# List files on device
+mpremote ls
+
+# List files in a directory
+mpremote ls :profiles
+
+# Remove a file
+mpremote rm :main.py
+
+# Create a directory
+mpremote mkdir :new_folder
+
+# Run a command on device
+mpremote exec "print('Hello from device')"
+
+# Get file from device
+mpremote cp :main.py main_backup.py
+
+# Mount device filesystem (requires mpremote 1.20+)
+mpremote mount .
+```
+
+### Flashing MicroPython (All Platforms)
+
+These methods work without Thonny and are useful for command-line workflows, automation, or if you prefer manual control.
+
+#### Method 1: Using Bootloader Mode
+
+This is the easiest method and works on all platforms without additional software.
+
+**For Raspberry Pi Pico / Pico W:**
+
+1. **Download firmware:**
+   - Go to https://micropython.org/download/
+   - Download the appropriate `.uf2` file for your board
+   - For Pico: `rp2-pico-latest.uf2`
+   - For Pico W: `rp2-pico-w-latest.uf2`
+
+2. **Enter bootloader mode:**
+   - Disconnect the device from USB
+   - Hold down the BOOTSEL button on the board
+   - While holding BOOTSEL, connect the USB cable
+   - Release BOOTSEL after connecting
+   - The device appears as a USB drive named "RPI-RP2"
+
+3. **Flash the firmware:**
+   - **Windows:** Open File Explorer, drag the `.uf2` file to the RPI-RP2 drive
+   - **Mac:** Open Finder, drag the `.uf2` file to the RPI-RP2 volume
+   - **Linux:** 
+     ```bash
+     cp rp2-pico-latest.uf2 /media/$USER/RPI-RP2/
+     ```
+     or
+     ```bash
+     cp rp2-pico-latest.uf2 /run/media/$USER/RPI-RP2/
+     ```
+
+4. **Automatic reboot:**
+   - The device automatically reboots after copying
+   - The RPI-RP2 drive will disappear
+   - MicroPython is now installed
+
+5. **Verify installation:**
+   - Use a serial terminal (see below)
+   - Or use mpremote: `mpremote` should show the REPL prompt
+
+#### Method 2: Using Other Command Line Tools
+
+**picotool (Linux/Mac/Windows):**
+
+```bash
+# Install picotool first
+# https://github.com/raspberrypi/picotool
+
+# Hold BOOTSEL and connect device, then:
+picotool load firmware.uf2
+picotool reboot
+```
