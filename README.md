@@ -144,8 +144,12 @@ Note: This diagram excludes any power connections.
 ```python
 import test_hardware
 
-# Run all tests
+# Run all tests with current hardware configuration
 test_hardware.test_hardware()
+
+# Run all tests with a specific hardware configuration
+test_hardware.test_hardware(hardware_config='default')
+test_hardware.test_hardware(hardware_config='custom_setup')
 
 # Run specific tests
 test_hardware.test_hardware('leds')          # Test RGB LEDs
@@ -157,12 +161,23 @@ test_hardware.test_hardware('switches')      # Test push buttons
 test_hardware.test_hardware('adc')           # Test voltage monitoring
 test_hardware.test_hardware('heater')        # Test heater output (WARNING: activates heater!)
 
-# Run multiple tests
+# Run multiple tests with specific hardware configuration
 test_hardware.test_hardware('leds', 'display', 'thermocouple')
+test_hardware.test_hardware('leds', 'buzzer', hardware_config='test_board')
 ```
 
 The test suite will:
-- Read your `hardware.txt` configuration
+- Read your hardware configuration from `current_hardware.txt` (default) or from a specific configuration in `hardware_profiles/`
 - Test each component systematically
 - Report PASSED/FAILED/SKIPPED for each test
 - Provide visual and interactive feedback
+- Halt immediately if the specified hardware configuration cannot be loaded
+
+### Hardware Configuration System
+
+Hardware configurations are stored in the `hardware_profiles/` directory:
+- `hardware_default.txt` - Fallback configuration
+- `hardware_profiles/default.txt` - Default hardware setup
+- `hardware_profiles/custom_name.txt` - Your custom configurations
+
+The system reads `current_hardware.txt` to determine which configuration to load at boot. You can switch configurations by loading a profile that specifies different hardware, which will update `current_hardware.txt` and reboot.

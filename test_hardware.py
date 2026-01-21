@@ -469,8 +469,12 @@ def test_thermocouple(hw):
             
             if fault:
                 test_result('Thermocouple', False, "Thermocouple not connected (fault bit set)")
+            elif raw_data == 0x0000:
+                test_result('Thermocouple', False, "No data from thermocouple (raw data 0x0000 - check wiring)")
             elif temp_c < -50 or temp_c > 600:
                 test_result('Thermocouple', False, f"Temperature out of range: {temp_c}°C")
+            elif temp_c == 0.00:
+                test_result('Thermocouple', False, "Suspicious reading of exactly 0.00°C (likely hardware issue)")
             else:
                 test_result('Thermocouple', True, f"Temperature reading: {temp_c:.2f}°C")
         except Exception as e:
@@ -596,21 +600,43 @@ def test_hardware(*test_names, hardware_config=None):
     print()
 
     # Load configuration
-    if hardware_config:
-        print(f"Loading hardware configuration: {hardware_config}...")
-        hw, hardware_name = utils.load_hardware_config(hardware_config)
-    else:
-        print("Loading hardware configuration from current_hardware.txt...")
-        hw, hardware_name = utils.load_hardware_config()
+    try:
+        if hardware_config:
+            print(f"Loading hardware configuration: {hardware_config}...")
+            hw, hardware_name = utils.load_hardware_config(hardware_config)
+        else:
+            print("Loading normal hardware configuration...")
+            hw, hardware_name = utils.load_hardware_config()
+    except FileNotFoundError as e:
+        print(f"✗ FATAL: Hardware configuration file not found")
+        print(f"   Error: {e}")
+        print("   Please ensure the hardware configuration file exists.")
+        return
+    except Exception as e:
+        print(f"✗ FATAL: Error loading hardware configuration")
+        print(f"   Error: {e}")
+        return
     
-    if hw is None:
+    # Check if hardware config loaded successfully
+    if hw is None or not isinstance(hw, dict):
         print("✗ FATAL: Could not load hardware config")
         print("Please ensure a valid hardware_default.txt or current_hardware.txt exists.")
         return
+    
+    # If a specific hardware config was requested but we got 'default', that's a failure
+    if hardware_config and hardware_name != hardware_config:
+        print(f"✗ FATAL: Failed to load requested hardware config '{hardware_config}'")
+        print(f"   System fell back to '{hardware_name}' instead")
+        print(f"   Please check that /hardware_profiles/{hardware_config}.txt exists and is valid")
+        return
+    
+    # Check if any hardware pins are configured
+    if not hw or len(hw) == 0:
+        print("✗ FATAL: Hardware configuration is empty")
+        print("Please ensure the hardware configuration file contains valid pin definitions.")
+        return
 
-    print(f"Loaded hardware config: {hardware_name}")
-
-    print("✓ Configuration loaded successfully")
+    print(f"✓ Loaded hardware config: {hardware_name}")
     print()
     
     # Map of test names to test functions
