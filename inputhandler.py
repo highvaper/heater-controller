@@ -185,16 +185,18 @@ class InputHandler:
                     cur = self.rotary.value()
                     if self.button_pressed:
                         # Button pressed: larger jumps (1% under 30%, 10% above)
-                        if cur < 300:  # less than 30.0%
-                            adjustment_rate = 10
-                        else:
-                            adjustment_rate = 100
+                        #if cur < 300:  # less than 30.0%
+                        #    adjustment_rate = 10
+                        #else:
+                        #    adjustment_rate = 100
+                        adjustment_rate = 10
                     else:
                         # Button not pressed: fine adjustments (0.1% under 30%, 1% above)
-                        if cur < 300:
-                            adjustment_rate = 1
-                        else:
-                            adjustment_rate = 10
+                        #if cur < 300:
+                        #    adjustment_rate = 1
+                        #else:
+                        #    adjustment_rate = 10
+                        adjustment_rate = 1
                 else:
                     # Non-duty controls: accelerate when button is held, otherwise single-step only
                     adjustment_rate = 10 if self.button_pressed else 0

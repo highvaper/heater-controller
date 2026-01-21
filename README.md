@@ -148,7 +148,6 @@ import test_hardware
 test_hardware.test_hardware()
 
 # Run all tests with a specific hardware configuration
-test_hardware.test_hardware(hardware_config='default')
 test_hardware.test_hardware(hardware_config='custom_setup')
 
 # Run specific tests
@@ -177,7 +176,6 @@ The test suite will:
 
 Hardware configurations are stored in the `hardware_profiles/` directory:
 - `hardware_default.txt` - Fallback configuration
-- `hardware_profiles/default.txt` - Default hardware setup
 - `hardware_profiles/custom_name.txt` - Your custom configurations
 
 The system reads `current_hardware.txt` to determine which configuration to load at boot. You can switch configurations by loading a profile that specifies different hardware, which will update `current_hardware.txt` and reboot.
