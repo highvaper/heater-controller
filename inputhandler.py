@@ -184,14 +184,14 @@ class InputHandler:
                 if self.shared_state.control == 'duty_cycle':
                     cur = self.rotary.value()
                     if self.button_pressed:
-                        # Button pressed: larger jumps (1% under 10%, 10% above)
-                        if cur < 100:  # less than 10.0%
+                        # Button pressed: larger jumps (1% under 30%, 10% above)
+                        if cur < 300:  # less than 30.0%
                             adjustment_rate = 10
                         else:
                             adjustment_rate = 100
                     else:
-                        # Button not pressed: fine adjustments (0.1% under 10%, 1% above)
-                        if cur < 100:
+                        # Button not pressed: fine adjustments (0.1% under 30%, 1% above)
+                        if cur < 300:
                             adjustment_rate = 1
                         else:
                             adjustment_rate = 10
