@@ -30,7 +30,7 @@ from machine import Pin, SPI, I2C, ADC, PWM
 import utime
 import sys
 
-from utils import load_hardware_config
+import utils
 
 # Test tracking
 tests_passed = 0
@@ -592,7 +592,7 @@ def test_hardware(*test_names):
 
     # Load configuration
     print("Loading hardware configuration from hardware.txt...")
-    hw = load_hardware_config()
+    hw = utils.load_hardware_config()
     if hw is None:
         print("✗ FATAL: Could not load hardware.txt")
         print("Please ensure hardware.txt exists in the same directory.")

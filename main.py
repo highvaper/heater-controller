@@ -21,14 +21,13 @@ from menusystem import MenuSystem
 
 from heaters import HeaterFactory, InductionHeater, ElementHeater
 
-from utils import initialize_display, get_input_volts, buzzer_play_tone, get_thermocouple_temperature_or_handle_error, get_pi_temperature_or_handle_error, load_profile, list_profiles, apply_and_save_profile, apply_and_save_autosession_profile, list_autosession_profiles, create_autosession_log_file, log_autosession_data, flush_autosession_log, set_voltage_divider_adc_pin, load_hardware_config, check_disk_space
-
+import utils
 
 from shared_state import SharedState
 
 
 # Load hardware configuration
-hw = load_hardware_config()
+hw = utils.load_hardware_config()
 
 # Pin assignments (with fallback defaults if hardware.txt is missing)
 hardware_pin_red_led = hw.get('red_led', 17)
@@ -56,7 +55,7 @@ hardware_pin_heater = hw.get('heater', 22)
 hardware_pin_voltage_divider_adc = hw.get('voltage_divider_adc', 28)
 
 # Configure global hardware pins in utils module
-set_voltage_divider_adc_pin(hardware_pin_voltage_divider_adc)
+utils.set_voltage_divider_adc_pin(hardware_pin_voltage_divider_adc)
 
 
 ####################################
@@ -68,7 +67,7 @@ set_voltage_divider_adc_pin(hardware_pin_voltage_divider_adc)
 def timerSetPiTemp(t):
     global pi_temperature_sensor, pidTimer, display_manager, heater, shared_state
    
-    shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager,shared_state)
+    shared_state.pi_temperature = utils.get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager,shared_state)
     
     # Check if the temperature is safe
     if shared_state.pi_temperature > shared_state.pi_temperature_limit:
@@ -78,7 +77,7 @@ def timerSetPiTemp(t):
             error_text = shared_state.error_messages.get("pi-too_hot", "PI too hot")
             shared_state.set_error("pi-too_hot", error_text)
             while not shared_state.pi_temperature <= shared_state.pi_temperature_limit:
-                shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager,shared_state)
+                shared_state.pi_temperature = utils.get_pi_temperature_or_handle_error(pi_temperature_sensor,display_manager,shared_state)
                 utime.sleep_ms(250)  # Warning shown for 5 secs so has had a time to cool down a bit
             
             shared_state.clear_error()
@@ -99,7 +98,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         shared_state.pid.setpoint = shared_state.temperature_setpoint
 
     if thermocouple is not None:
-        new_heater_temperature, need_heater_off_temperature = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
+        new_heater_temperature, need_heater_off_temperature = utils.get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
     else:
         new_heater_temperature = 0
         need_heater_off_temperature = False
@@ -111,7 +110,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     # new temperature is valid
     shared_state.heater_temperature = new_heater_temperature
     
-    shared_state.input_volts = get_input_volts(shared_state.input_volts)
+    shared_state.input_volts = utils.get_input_volts(shared_state.input_volts)
 
     #shared_state.heater_max_duty_cycle_percent - need to update this now and adjust to MAX WATTS (add to shared state)
     if shared_state.input_volts > 0:
@@ -127,7 +126,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         heater.off()
         print("Getting safe off heater temperature")
         utime.sleep_ms(301) # lets give everything a moment to calm down
-        new_heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
+        new_heater_temperature, _ = utils.get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
         if new_heater_temperature < 0: # Non fatal error occured 
             return   # Let timer run this again and hopefully next time error has passed
         # new off temperature is valid
@@ -256,7 +255,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         elapsed_ms = max(0, elapsed_ms)
         
         # Log the data with buffering
-        shared_state.autosession_log_buffer, shared_state.autosession_log_file = log_autosession_data(
+        shared_state.autosession_log_buffer, shared_state.autosession_log_file = utils.log_autosession_data(
             shared_state.autosession_log_file,
             shared_state.autosession_log_buffer,
             elapsed_ms,
@@ -336,11 +335,11 @@ shared_state = SharedState(led_red_pin=led_red_pin, led_green_pin=led_green_pin,
 
 
 # Load normal profiles list
-shared_state.profile_list = list_profiles()
+shared_state.profile_list = utils.list_profiles()
 shared_state.profile_selection_index = 0
 
 # Load autosession profiles list (do not load profile itself)
-shared_state.autosession_profile_list = list_autosession_profiles()
+shared_state.autosession_profile_list = utils.list_autosession_profiles()
 shared_state.autosession_profile_selection_index = 0
 
 
@@ -350,7 +349,7 @@ try:
         profile_name = f.readline().strip()
     if profile_name:
         print(f"Loading profile: {profile_name}")
-        config = load_profile(profile_name, shared_state)
+        config = utils.load_profile(profile_name, shared_state)
         shared_state.apply_profile(config)
         shared_state.set_profile_name(profile_name)
     else:
@@ -364,7 +363,7 @@ except OSError:
 # First check if the loaded profile has a default_autosession_profile
 if shared_state.default_autosession_profile:
     print(f"Loading default autosession profile from profile: {shared_state.default_autosession_profile}")
-    success, message = apply_and_save_autosession_profile(shared_state.default_autosession_profile, shared_state)
+    success, message = utils.apply_and_save_autosession_profile(shared_state.default_autosession_profile, shared_state)
     print(message)
 else:
     # Fall back to current_autosession_profile.txt if no default in profile
@@ -373,7 +372,7 @@ else:
             autosession_profile_name = f.readline().strip()
         if autosession_profile_name:
             print(f"Loading autosession profile: {autosession_profile_name}")
-            success, message = apply_and_save_autosession_profile(autosession_profile_name, shared_state)
+            success, message = utils.apply_and_save_autosession_profile(autosession_profile_name, shared_state)
             print(message)
         else:
             print("No autosession profile name found in /current_autosession_profile.txt")
@@ -390,7 +389,7 @@ display_type = hw.get('display_type', 'SSD1306_128x32')
 
 print("Display Initialising ...")
 if display_type in 'SSD1306_128x32,SSD1306_128x64':
-    display = initialize_display(hardware_pin_display_scl, hardware_pin_display_sda, led_red_pin)
+    display = utils.initialize_display(hardware_pin_display_scl, hardware_pin_display_sda, led_red_pin)
 else:
     error_text = "Display init failed - unknown display type: " + str(display_type)
     print(error_text)   
@@ -426,11 +425,19 @@ except Exception as e:
 #        - 1 buzz when hitting setpoint for first time in a session
 print("Buzzer Initialising ...")
 buzzer = PWM(Pin(hardware_pin_buzzer))
-buzzer_play_tone(buzzer, 2500, 200)  # Play a sound so we know its connected correctly
+utils.buzzer_play_tone(buzzer, 2500, 200)  # Play a sound so we know its connected correctly
 print("Buzzer initialised.")
 
 # Check disk space
-_ = check_disk_space(display_manager, buzzer)
+free_kb = utils.get_free_disk_space()
+if free_kb is not None:
+    print(f"Free disk space: {int(free_kb)}KB")
+    if free_kb < 200:
+        utils.buzzer_play_tone(buzzer, 1500, 300)
+        utime.sleep_ms(100)
+        utils.buzzer_play_tone(buzzer, 1500, 300)
+        display_manager.show_low_disk_space_screen(free_kb)
+        print(f"Warning: Low disk space - {int(free_kb)}KB remaining")
 
 #button_pin = Pin(hardware_pin_button, Pin.IN)
 button_pin = Pin(hardware_pin_switch_middle, Pin.IN, Pin.PULL_UP)
@@ -442,9 +449,9 @@ if button_pin.value():
 else:
     enable_watchdog = False
     utime.sleep_ms(150)
-    buzzer_play_tone(buzzer, 2000, 250)
+    utils.buzzer_play_tone(buzzer, 2000, 250)
     utime.sleep_ms(150)
-    buzzer_play_tone(buzzer, 1000, 250)
+    utils.buzzer_play_tone(buzzer, 1000, 250)
     display_manager.show_watchdog_off_screen()
     print("Watchdog: Off")
 del button_pin
@@ -499,7 +506,7 @@ if shared_state.has_error():
 
 # PI Temperature Sensor 
 pi_temperature_sensor = machine.ADC(4)
-shared_state.pi_temperature = get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager, shared_state)
+shared_state.pi_temperature = utils.get_pi_temperature_or_handle_error(pi_temperature_sensor, display_manager, shared_state)
 
 
 # InputHandler
@@ -510,7 +517,7 @@ menu_system = MenuSystem(display_manager, shared_state)
 
 
 while shared_state.input_volts is False:
-    shared_state.input_volts = get_input_volts(False)
+    shared_state.input_volts = utils.get_input_volts(False)
     utime.sleep_ms(50)
 
 #lets do some sanity checks on power level 
@@ -532,7 +539,7 @@ heater.off()
 
 
 pidTimer = CustomTimer(371, machine.Timer.PERIODIC, timerUpdatePIDandHeater)  # need to have timer setup before calling below 
-shared_state.heater_temperature, _ = get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
+shared_state.heater_temperature, _ = utils.get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
 # Do not start timers here; they'll be started when the asyncio loop is running
 # pidTimer.start()
 # pid.reset()
@@ -619,7 +626,7 @@ async def async_main():
                     # Check if user clicked on profiles screen to load a profile
                     if shared_state.rotary_last_mode == "Profiles" and shared_state.profile_load_pending:
                         if shared_state.profile_list:
-                            success, message = apply_and_save_profile(shared_state.profile_list[shared_state.profile_selection_index], shared_state)
+                            success, message = utils.apply_and_save_profile(shared_state.profile_list[shared_state.profile_selection_index], shared_state)
                             #display_manager.display_error(message, 2, False)
                         shared_state.profile_load_pending = False
                         # Return to home screen
@@ -628,7 +635,7 @@ async def async_main():
                     # Check if user clicked on autosession profiles screen to load an autosession profile
                     elif shared_state.rotary_last_mode == "Autosession Profiles" and shared_state.autosession_profile_load_pending:
                         if shared_state.autosession_profile_list:
-                            success, message = apply_and_save_autosession_profile(shared_state.autosession_profile_list[shared_state.autosession_profile_selection_index], shared_state)
+                            success, message = utils.apply_and_save_autosession_profile(shared_state.autosession_profile_list[shared_state.autosession_profile_selection_index], shared_state)
                             #display_manager.display_error(message, 2, False)
                         shared_state.autosession_profile_load_pending = False
                         # Return to home screen
@@ -671,22 +678,22 @@ async def async_main():
                     if not shared_state.autosession_logging_active:
                         # Ensure any previous buffer is flushed before starting new logging
                         if shared_state.autosession_log_file is not None:
-                            flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
+                            utils.flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
                         shared_state.autosession_logging_active = True
-                        shared_state.autosession_log_file, _ = create_autosession_log_file(shared_state.profile, shared_state.autosession_profile_name)
+                        shared_state.autosession_log_file, _ = utils.create_autosession_log_file(shared_state.profile, shared_state.autosession_profile_name)
                         shared_state.autosession_log_buffer = []
                 else:
                     # Stop logging if it was active
                     if shared_state.autosession_logging_active:
                         shared_state.autosession_logging_active = False
-                        flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
+                        utils.flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
                         shared_state.autosession_log_file = None
                         shared_state.autosession_log_buffer = []
             else:
                 # If logging is disabled, ensure we stop any active logging
                 if shared_state.autosession_logging_active:
                     shared_state.autosession_logging_active = False
-                    flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
+                    utils.flush_autosession_log(shared_state.autosession_log_file, shared_state.autosession_log_buffer)
                     shared_state.autosession_log_file = None
                     shared_state.autosession_log_buffer = []
 
