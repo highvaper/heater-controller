@@ -5,7 +5,7 @@ import sys
 from collections import deque
 
 import machine
-from machine import ADC, Pin, I2C, Timer, WDT, PWM
+from machine import ADC, Pin, I2C, Timer, WDT, PWM, reset
 
 from ssd1306 import SSD1306_I2C
 
@@ -27,7 +27,7 @@ from shared_state import SharedState
 
 
 # Load hardware configuration
-hw = utils.load_hardware_config()
+hw, hardware_name = utils.load_hardware_config()
 
 # Pin assignments (with fallback defaults if hardware.txt is missing)
 hardware_pin_red_led = hw.get('red_led', 17)
@@ -332,6 +332,9 @@ except Exception as e:
 
 shared_state = SharedState(led_red_pin=led_red_pin, led_green_pin=led_green_pin, led_blue_pin=led_blue_pin)
 
+# Set the hardware name from loaded config
+shared_state.hardware = hardware_name
+
 # Load profile list at startup (like show_settings loads all settings once)
 
 
@@ -352,6 +355,27 @@ try:
     if profile_name:
         print(f"Loading profile: {profile_name}")
         config = utils.load_profile(profile_name, shared_state)
+        
+        # Check if profile requires different hardware than currently loaded
+        profile_hardware = config.get('hardware', 'default')
+        if profile_hardware != hardware_name:
+            print(f"Profile requires hardware '{profile_hardware}' but '{hardware_name}' is loaded")
+            print(f"Updating current_hardware.txt and rebooting...")
+            try:
+                with open('/current_hardware.txt', 'w') as f:
+                    f.write(profile_hardware)
+                print(f"Saved current hardware: {profile_hardware}")
+                #no screen message as display may not be working with new hardware
+                #flash blue led 3 times and reboot
+                for _ in range(3):
+                    led_blue_pin.on()
+                    utime.sleep_ms(200)
+                    led_blue_pin.off()
+                    utime.sleep_ms(200)
+                reset()
+            except Exception as e:
+                print(f"Error updating hardware config: {e}")
+        
         shared_state.apply_profile(config)
         shared_state.set_profile_name(profile_name)
     else:
@@ -634,7 +658,14 @@ async def async_main():
                     # Check if user clicked on profiles screen to load a profile
                     if shared_state.rotary_last_mode == "Profiles" and shared_state.profile_load_pending:
                         if shared_state.profile_list:
-                            success, message = utils.apply_and_save_profile(shared_state.profile_list[shared_state.profile_selection_index], shared_state)
+                            success, message, needs_reboot = utils.apply_and_save_profile(shared_state.profile_list[shared_state.profile_selection_index], shared_state)
+                            if needs_reboot:
+                                display_manager.display.fill(0)
+                                display_manager.display.text("Hardware setup changed", 0, 0, 1)
+                                display_manager.display.text("Rebooting...", 0, 8, 1)
+                                display_manager.display.show()
+                                utime.sleep_ms(2000)  # Give time to read the message
+                                reset()
                             #display_manager.display_error(message, 2, False)
                         shared_state.profile_load_pending = False
                         # Return to home screen

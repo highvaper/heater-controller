@@ -59,6 +59,9 @@ class SharedState:
         # Track which profile is currently loaded 
         #need to rename to profile_name 
         self.profile = "default"  # Will be updated when a profile is loaded
+        
+        # Track which hardware config is currently loaded
+        self.hardware = "default"  # Will be updated when hardware is loaded
        
         self.session_timeout = 7 * 60 * 1000       # length of time for a session before auto off (7 mins)
         self.session_extend_time = 2 * 60 * 1000   # length of time to extens senssion by when single click in last minute of session
@@ -324,6 +327,8 @@ class SharedState:
             self.power_threshold = profile_config['power_threshold']
         if 'heater_on_temperature_difference_threshold' in profile_config:
             self.heater_on_temperature_difference_threshold = profile_config['heater_on_temperature_difference_threshold']
+        if 'heater_type' in profile_config:
+            self.heater_type = profile_config['heater_type']
         if 'max_watts' in profile_config:
             self.max_watts = profile_config['max_watts']
 
@@ -362,7 +367,11 @@ class SharedState:
             self.default_autosession_profile = profile_config['default_autosession_profile']
         if 'autosession_log_buffer_flush_threshold' in profile_config:
             self.autosession_log_buffer_flush_threshold = profile_config['autosession_log_buffer_flush_threshold']
+        
+        if 'hardware' in profile_config:
+            self.hardware = profile_config['hardware']
 
+        
         # If the profile requested a control mode, ensure it's enabled
         if 'control' in profile_config:
             desired = profile_config['control']

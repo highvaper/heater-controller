@@ -119,3 +119,7 @@ default_autosession_profile=quicktest
 # Number of lines to buffer before flushing to file. Higher values reduce I/O but use more memory.
 # Default is 20 lines
 autosession_log_buffer_flush_threshold=50
+
+
+# Name of hardware file to load from /hardware_profiles/ 
+#hardware=myhardware

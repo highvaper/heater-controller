@@ -129,9 +129,10 @@ class DisplayManager:
 
         self.display.text('MicroPython',  self.get_centered_text_start_position('MicroPython'), 0, 1)
         self.display.text('Heater', self.get_centered_text_start_position('Heater'), 8, 1)
-        self.display.text('Controller', self.get_centered_text_start_position('Controller'), 16, 1)
         profile_text = self.shared_state.profile
-        self.display.text(profile_text, self.get_centered_text_start_position(profile_text), 24, 1)
+        self.display.text(profile_text, self.get_centered_text_start_position(profile_text), 16, 1)
+        hardware_text = self.shared_state.hardware
+        self.display.text(hardware_text, self.get_centered_text_start_position(hardware_text), 24, 1)
 
         self.display.show()
         utime.sleep_ms(2000) # Wait for 2 seconds to display the first set of messages

@@ -566,7 +566,7 @@ def test_adc(hw):
 # Main Test Function
 # ============================================================
 
-def test_hardware(*test_names):
+def test_hardware(*test_names, hardware_config=None):
     """
     Run hardware tests.
     
@@ -574,11 +574,16 @@ def test_hardware(*test_names):
         *test_names: Optional test names to run. If no arguments provided, runs all tests.
                     Valid test names: 'leds', 'buzzer', 'rotary', 'switches', 'display',
                                      'thermocouple', 'heater', 'adc'
+        hardware_config: Optional hardware configuration name to load 
+                        (e.g., 'default', 'testhardware')
+                        If not specified, uses current_hardware.txt
     
     Examples:
-        test_hardware()                          # Run all tests
+        test_hardware()                          # Run all tests with current hardware
+        test_hardware(hardware_config='testhardware')  # Run all tests with specific hardware
         test_hardware('leds')                    # Run only LED test
         test_hardware('leds', 'display')         # Run LED and display tests
+        test_hardware('leds', hardware_config='testhardware')  # LED test with specific hardware
     """
     global tests_passed, tests_failed, tests_skipped
     tests_passed = 0
@@ -591,12 +596,19 @@ def test_hardware(*test_names):
     print()
 
     # Load configuration
-    print("Loading hardware configuration from hardware.txt...")
-    hw = utils.load_hardware_config()
+    if hardware_config:
+        print(f"Loading hardware configuration: {hardware_config}...")
+        hw, hardware_name = utils.load_hardware_config(hardware_config)
+    else:
+        print("Loading hardware configuration from current_hardware.txt...")
+        hw, hardware_name = utils.load_hardware_config()
+    
     if hw is None:
-        print("✗ FATAL: Could not load hardware.txt")
-        print("Please ensure hardware.txt exists in the same directory.")
+        print("✗ FATAL: Could not load hardware config")
+        print("Please ensure a valid hardware_default.txt or current_hardware.txt exists.")
         return
+
+    print(f"Loaded hardware config: {hardware_name}")
 
     print("✓ Configuration loaded successfully")
     print()

@@ -3,10 +3,9 @@ import utime
 #import sys ? do we need this?
 import os
 #from machine import ADC, Pin, I2C, Timer, WDT, PWM
-from machine import Pin, I2C
+from machine import Pin, I2C, ADC, reset
 from ssd1306 import SSD1306_I2C
 from heaters import HeaterFactory, InductionHeater, ElementHeater
-from machine import ADC
 
 from autosession import AutoSessionTemperatureProfile
 
@@ -33,17 +32,27 @@ def get_free_disk_space():
         print(f"Could not check disk space: {e}")
         return None
 
-def load_hardware_config(filename='hardware.txt'):
-    """Load hardware pin configuration from a text file."""
+
+def parse_config_file(filename):
+    """Parse a configuration file with key=value pairs.
+    
+    Skips empty lines and comments (lines starting with #).
+    Removes inline comments after values.
+    Attempts to parse values as integers, falls back to strings.
+    
+    Args:
+        filename: Path to the config file to parse
+        
+    Returns:
+        dict: Parsed configuration as {key: value} pairs
+    """
     config = {}
     try:
         with open(filename, 'r') as f:
             for line in f:
                 line = line.strip()
-                # Skip empty lines and comments
                 if not line or line.startswith('#'):
                     continue
-                # Parse key=value pairs
                 if '=' in line:
                     key, value = line.split('=', 1)
                     key = key.strip()
@@ -51,12 +60,75 @@ def load_hardware_config(filename='hardware.txt'):
                     try:
                         config[key] = int(value)
                     except ValueError:
-                        # Store as string if not a valid integer
                         config[key] = value
     except Exception as e:
-        print(f"Error loading hardware.txt: {e}")
-        print("Using default pin configuration")
+        raise Exception(f"Error parsing {filename}: {e}")
     return config
+
+def load_hardware_config(hardware_name=None):
+    """Load hardware pin configuration from a text file.
+    
+    If hardware_name is provided, loads that specific hardware config.
+    Otherwise, reads current_hardware.txt to get the hardware config name,
+    then loads hardware_profiles/<name>.txt. Falls back to hardware_default.txt
+    if current_hardware.txt doesn't exist or has errors.
+    
+    Args:
+        hardware_name: Optional hardware config name to load directly (e.g., 'default', 'testhardware')
+    
+    Returns:
+        tuple: (config dict, hardware_name string)
+    """
+    config = {}
+    
+    # If hardware_name is explicitly provided, load that config directly
+    if hardware_name is not None:
+        try:
+            hardware_filename = f'/hardware_profiles/{hardware_name}.txt'
+            config = parse_config_file(hardware_filename)
+            print(f"Loaded hardware config: {hardware_name}")
+        except Exception as e:
+            print(str(e))
+            print(f"Failed to load hardware config: {hardware_name}")
+        return config, hardware_name
+    
+    # Read current_hardware.txt to get the hardware config name
+    try:
+        with open('/current_hardware.txt', 'r') as f:
+            hardware_name = f.readline().strip()
+        if not hardware_name:
+            print("Warning: current_hardware.txt is empty, using 'default'")
+            try:
+                os.remove('/current_hardware.txt')   
+            except OSError:
+                pass
+            hardware_name = ''
+    except OSError:
+        print("No /current_hardware.txt found, using 'default' hardware")
+        hardware_name = ''
+    
+    # Load the specified hardware configuration
+    hardware_filename = f'/hardware_profiles/{hardware_name}.txt'
+    try:
+        config = parse_config_file(hardware_filename)
+        print(f"Loaded hardware config: {hardware_name}")
+    except Exception as e:
+        print(str(e))
+        print("Falling back to /hardware_default.txt")
+        # Fallback to default hardware config
+        try:
+            os.remove('/current_hardware.txt')   
+        except OSError:
+            pass
+        try:
+            config = parse_config_file('/hardware_default.txt')
+            hardware_name = 'default'
+            print("Loaded /hardware_default.txt")
+        except Exception as e2:
+            print(str(e2))
+            print("Using empty hardware configuration")
+    
+    return config, hardware_name
 
 
 def create_autosession_log_file(profile_name, autosession_profile_name):
@@ -150,126 +222,159 @@ def flush_autosession_log(log_file, log_buffer):
 
 
 def load_profile(profile_name, shared_state):
-
+    """Load profile configuration from file and validate values.
+    
+    Args:
+        profile_name: Name of the profile file (without .txt extension)
+        shared_state: SharedState object to get default values from
+        
+    Returns:
+        dict: Configuration dictionary with validated values
+    """
     # Start with defaults from SharedState.initialize_defaults()
     config = shared_state.initialize_defaults()
     
     try:
-        with open('/profiles/' + profile_name +'.txt', 'r') as file:
-            for line in file:
-                if line.strip() and not line.startswith('#'):  # Ignore empty lines and comments
-                    parts = line.strip().split('=', 1)  # Split on first '=' only
-                    if len(parts) == 2:
-                        key, value = parts
-                        key = key.strip()
-                        value = value.strip()
-                        
-                        # Type conversion based on expected types
-                        try:
-                            # Handle new key names (map to old attribute names for compatibility)
-                            if key in ['session_timeout', 'session_extend_time', 'temperature_setpoint', 'power_threshold',
-                                      'heater_on_temperature_difference_threshold', 'max_watts', 'click_check_timeout',
-                                      'temperature_max_allowed_setpoint', 'set_watts', 'lipo_count', 'pi_temperature_limit',
-                                      'autosession_log_buffer_flush_threshold']:
-                                config[key] = int(value)
-                                if key == 'session_timeout':
-                                    config[key] = int(value) * 1000  # Convert to milliseconds
-                                elif key == 'session_extend_time':
-                                    config[key] = int(value) * 1000  # Convert to milliseconds
-                                elif key == 'temperature_setpoint':
-                                    if int(value) > 0 and int(value) <= 300:
-                                        config[key] = int(value)
-                                    else:
-                                        print(f"Warning: temperature_setpoint out of range (1-300): {value}")
-                                elif key == 'temperature_max_allowed_setpoint':
-                                    if int(value) > 0 and int(value) <= 300:
-                                        config[key] = int(value)
-                                    else:
-                                        print(f"Warning: temperature_max_allowed_setpoint out of range (1-300): {value}")
-                                elif key == 'max_watts':
-                                    if int(value) > 0 and int(value) <= 150:
-                                        config[key] = int(value)
-                                    else:
-                                        print(f"Warning: max_watts out of range (1-150): {value}")
-                                elif key == 'set_watts':
-                                    if int(value) >= 0 and int(value) <= 150:
-                                        config[key] = int(value)
-                                    else:
-                                        print(f"Warning: set_watts out of range (0-150): {value}")
-                                elif key == 'autosession_log_buffer_flush_threshold':
-                                    if int(value) > 0 and int(value) <= 200:
-                                        config[key] = int(value)
-                                    else:
-                                        print(f"Warning: autosession_log_buffer_flush_threshold out of range (1-200): {value}")
-                            elif key == 'set_duty_cycle':
-                                # Allow decimal duty cycle values (e.g., 12.3 for 12.3%)
-                                try:
-                                    dc = float(value)
-                                    if 0.0 <= dc <= 100.0:
-                                        config[key] = dc
-                                    else:
-                                        print(f"Warning: set_duty_cycle out of range (0-100): {value}")
-                                except ValueError:
-                                    print(f"Warning: Could not parse set_duty_cycle value: {value}")
-                            elif key == 'heater_resistance':
-                                res_value = float(value)
-                                if res_value < 0.3:
-                                    print(f"Warning: heater_resistance too low (<0.3 ohms): {value}")
-                                elif res_value > 2.5:
-                                    print(f"Warning: heater_resistance too high (>2.5 ohms): {value}")
-                                else:
-                                    config[key] = res_value
-                            elif key in ['lipo_safe_volts', 'lead_safe_volts', 'mains_safe_volts']:
-                                config[key] = float(value)
-                            elif key in ['display_contrast']:
-                                if 0 <= int(value) <= 255:
-                                    config[key] = int(value)
-                                else:
-                                    print(f"Warning: display_contrast out of range (0-255): {value}")
-                            elif key in ['temperature_units', 'default_autosession_profile']:
-                                # temperature_units: 'C' or 'F', default_autosession_profile: string profile name or empty
-                                if key == 'temperature_units':
-                                    if value in ['C', 'F']:
-                                        config[key] = value
-                                    else:
-                                        print(f"Warning: temperature_units must be 'C' or 'F': {value}")
-                                elif key == 'default_autosession_profile':
-                                    # Accept any non-empty string as a profile name, or empty string for None
-                                    config[key] = value if value else None
-                            elif key in ['control']:
-                                if value in ['temperature_pid', 'watts']:
-                                    config[key] = value
-                                else:
-                                    print(f"Warning: control mode must be 'temperature_pid', 'watts', or 'duty_cycle': {value}")
-                            elif key in ['heater_type']:
-                                if value in ['element', 'induction']:
-                                    config[key] = value
-                                else:
-                                    print(f"Warning: heater_type must be 'element' or 'induction': {value}")
-                            elif key in ['power_type']:
-                                if value in ['mains', 'lipo', 'lead']:
-                                    config[key] = value
-                                else:
-                                    print(f"Warning: power_type must be 'mains', 'lipo', or 'lead': {value}")
-                            elif key in ['display_rotate', 'autosession_logging_enabled']:
-                                config[key] = value.lower() in ['true', '1', 'yes']
-                                
-                                # Check disk space when enabling autosession logging
-                                if key == 'autosession_logging_enabled' and config[key]:
-                                    free_kb = get_free_disk_space()
-                                    if free_kb is not None and free_kb < 200:
-                                        config[key] = False
-                                        print(f"Warning: Autosession logging disabled - low disk space ({int(free_kb)}KB)")
-                            elif key == 'pid_temperature_tunings':
-                                # Parse PID tunings as comma-separated float values: P,I,D
-                                tunings_str = value.split(',')
-                                if len(tunings_str) == 3:
-                                    config[key] = (float(tunings_str[0].strip()), float(tunings_str[1].strip()), float(tunings_str[2].strip()))
-                                else:
-                                    print(f"Warning: pid_temperature_tunings must be in format 'P,I,D' (got: {value})")
-                        except (ValueError, TypeError) as e:
-                            print(f"Warning: Could not parse {key}={value}: {e}")
-    except OSError as e:
+        # Parse the profile file to get raw key-value pairs
+        profile_filename = '/profiles/' + profile_name + '.txt'
+        raw_config = parse_config_file(profile_filename)
+        
+        # Process and validate each key from the raw config
+        for key, value in raw_config.items():
+            try:
+                # Integer keys with optional validation
+                if key in ['session_timeout', 'session_extend_time', 'temperature_setpoint', 'power_threshold',
+                          'heater_on_temperature_difference_threshold', 'max_watts', 'click_check_timeout',
+                          'temperature_max_allowed_setpoint', 'set_watts', 'lipo_count', 'pi_temperature_limit',
+                          'autosession_log_buffer_flush_threshold']:
+                    
+                    int_value = int(value)
+                    
+                    if key == 'session_timeout':
+                        config[key] = int_value * 1000  # Convert to milliseconds
+                    elif key == 'session_extend_time':
+                        config[key] = int_value * 1000  # Convert to milliseconds
+                    elif key == 'temperature_setpoint':
+                        if 0 < int_value <= 300:
+                            config[key] = int_value
+                        else:
+                            print(f"Warning: temperature_setpoint out of range (1-300): {value}")
+                    elif key == 'temperature_max_allowed_setpoint':
+                        if 0 < int_value <= 300:
+                            config[key] = int_value
+                        else:
+                            print(f"Warning: temperature_max_allowed_setpoint out of range (1-300): {value}")
+                    elif key == 'max_watts':
+                        if 0 < int_value <= 150:
+                            config[key] = int_value
+                        else:
+                            print(f"Warning: max_watts out of range (1-150): {value}")
+                    elif key == 'set_watts':
+                        if 0 <= int_value <= 150:
+                            config[key] = int_value
+                        else:
+                            print(f"Warning: set_watts out of range (0-150): {value}")
+                    elif key == 'autosession_log_buffer_flush_threshold':
+                        if 0 < int_value <= 200:
+                            config[key] = int_value
+                        else:
+                            print(f"Warning: autosession_log_buffer_flush_threshold out of range (1-200): {value}")
+                    else:
+                        # All other integer keys (no validation)
+                        config[key] = int_value
+                
+                # Float duty cycle
+                elif key == 'set_duty_cycle':
+                    dc = float(value)
+                    if 0.0 <= dc <= 100.0:
+                        config[key] = dc
+                    else:
+                        print(f"Warning: set_duty_cycle out of range (0-100): {value}")
+                
+                # Heater resistance (float with validation)
+                elif key == 'heater_resistance':
+                    res_value = float(value)
+                    if res_value < 0.3:
+                        print(f"Warning: heater_resistance too low (<0.3 ohms): {value}")
+                    elif res_value > 2.5:
+                        print(f"Warning: heater_resistance too high (>2.5 ohms): {value}")
+                    else:
+                        config[key] = res_value
+                
+                # Float voltage values
+                elif key in ['lipo_safe_volts', 'lead_safe_volts', 'mains_safe_volts']:
+                    config[key] = float(value)
+                
+                # Display contrast (integer with validation)
+                elif key == 'display_contrast':
+                    int_value = int(value)
+                    if 0 <= int_value <= 255:
+                        config[key] = int_value
+                    else:
+                        print(f"Warning: display_contrast out of range (0-255): {value}")
+                
+                # String values with validation
+                elif key == 'temperature_units':
+                    if value in ['C', 'F']:
+                        config[key] = value
+                    else:
+                        print(f"Warning: temperature_units must be 'C' or 'F': {value}")
+                
+                elif key == 'default_autosession_profile':
+                    # Accept any non-empty string as a profile name, or empty string for None
+                    config[key] = value if value else None
+                
+                elif key == 'hardware':
+                    # Accept any non-empty string as a hardware config name
+                    if value:
+                        config[key] = value
+                    else:
+                        print(f"Warning: hardware config name cannot be empty")
+                
+                elif key == 'control':
+                    if value in ['temperature_pid', 'watts', 'duty_cycle']:
+                        config[key] = value
+                    else:
+                        print(f"Warning: control mode must be 'temperature_pid', 'watts', or 'duty_cycle': {value}")
+                
+                elif key == 'heater_type':
+                    if value in ['element', 'induction']:
+                        config[key] = value
+                    else:
+                        print(f"Warning: heater_type must be 'element' or 'induction': {value}")
+                
+                elif key == 'power_type':
+                    if value in ['mains', 'lipo', 'lead']:
+                        config[key] = value
+                    else:
+                        print(f"Warning: power_type must be 'mains', 'lipo', or 'lead': {value}")
+                
+                # Boolean values
+                elif key in ['display_rotate', 'autosession_logging_enabled']:
+                    str_value = str(value).lower()
+                    config[key] = str_value in ['true', '1', 'yes']
+                    
+                    # Check disk space when enabling autosession logging
+                    if key == 'autosession_logging_enabled' and config[key]:
+                        free_kb = get_free_disk_space()
+                        if free_kb is not None and free_kb < 200:
+                            config[key] = False
+                            print(f"Warning: Autosession logging disabled - low disk space ({int(free_kb)}KB)")
+                
+                # PID tunings (tuple of floats)
+                elif key == 'pid_temperature_tunings':
+                    tunings_str = str(value).split(',')
+                    if len(tunings_str) == 3:
+                        config[key] = (float(tunings_str[0].strip()), 
+                                      float(tunings_str[1].strip()), 
+                                      float(tunings_str[2].strip()))
+                    else:
+                        print(f"Warning: pid_temperature_tunings must be in format 'P,I,D' (got: {value})")
+                
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Could not parse {key}={value}: {e}")
+        
+    except Exception as e:
         print(f"Warning: Could not load profile '{profile_name}': {e}")
     
     return config
@@ -296,11 +401,29 @@ def list_profiles():
 def apply_and_save_profile(profile_name, shared_state):
 
     if not profile_name:
-        return False, "No profile name provided"
+        return False, "No profile name provided", False
     
     try:
         print(f"Loading profile: {profile_name}")
         config = load_profile(profile_name, shared_state)
+        
+        # Check if hardware config is changing
+        hardware_change = False
+        new_hardware = None
+        
+        if 'hardware' in config:
+            # Profile specifies hardware - check if it's different
+            if config['hardware'] != shared_state.hardware:
+                print(f"Hardware change detected: {shared_state.hardware} -> {config['hardware']}")
+                hardware_change = True
+                new_hardware = config['hardware']
+        else:
+            # Profile doesn't specify hardware - default to 'default' if not already
+            if shared_state.hardware != 'default':
+                print(f"No hardware specified in profile, reverting to default (was: {shared_state.hardware})")
+                hardware_change = True
+                new_hardware = 'default'
+        
         shared_state.apply_profile(config)
         shared_state.set_profile_name(profile_name)
         shared_state.pid.reset() 
@@ -318,15 +441,26 @@ def apply_and_save_profile(profile_name, shared_state):
             print(f"Saved current profile: {profile_name}")
         except OSError as e:
             print(f"Warning: Could not save current profile: {e}")
-            return True, f"Profile loaded but not saved: {e}"
+            return True, f"Profile loaded but not saved: {e}", False
         
-        return True, f"Loaded: {profile_name}"
+        # If hardware changed, save new hardware and signal reboot needed
+        if hardware_change:
+            try:
+                with open('/current_hardware.txt', 'w') as f:
+                    f.write(new_hardware)
+                print(f"Saved current hardware: {new_hardware}")
+                print(f"Hardware changed to: {new_hardware}")
+                return True, f"Loaded: {profile_name}", True  # needs_reboot=True
+            except OSError as e:
+                print(f"Error saving current hardware: {e}")
+                return False, f"Profile loaded but could not save hardware: {e}", False
+        
+        return True, f"Loaded: {profile_name}", False  # needs_reboot=False
     except Exception as e:
         print(f"Error loading profile: {e}")
-        return False, f"Error loading profile"
+        return False, f"Error loading profile", False
 
 
-# AUTOSESSION PROFILE SUPPORT
 def load_autosession_profile(profile_name):
     try:
         with open('/profiles_autosession/' + profile_name + '.txt', 'r') as file:
