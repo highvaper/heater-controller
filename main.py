@@ -35,9 +35,9 @@ hardware_pin_switch_left = hw.get('switch_left', 23)
 hardware_pin_switch_middle = hw.get('switch_middle', 24)
 hardware_pin_switch_right = hw.get('switch_right', 25)
 
-hardware_pin_termocouple_sck = hw.get('thermocouple_sck', 6)
-hardware_pin_termocouple_cs = hw.get('thermocouple_cs', 7)
-hardware_pin_termocouple_so = hw.get('thermocouple_so', 8)
+hardware_pin_thermocouple_sck = hw.get('thermocouple_sck', 6)
+hardware_pin_thermocouple_cs = hw.get('thermocouple_cs', 7)
+hardware_pin_thermocouple_so = hw.get('thermocouple_so', 8)
 
 hardware_pin_heater = hw.get('heater', 22)
 hardware_pin_voltage_divider_adc = hw.get('voltage_divider_adc', 28)
@@ -78,7 +78,7 @@ def timerSetPiTemp(t):
         if not pidTimer.is_timer_running(): pidTimer.start()
 
 
-def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termocouple function 
+def timerUpdatePIDandHeater(t):  #may replace what this does in the check thermocouple function 
                                  #this needs a major clear up now we have share_state 
     global heater, thermocouple, pidTimer, display_manager, shared_state
 
@@ -147,7 +147,6 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
         
         if profile_setpoint is not None:
             # Profile is still active, update setpoint
-            profile_setpoint = profile_setpoint
             shared_state.temperature_setpoint = profile_setpoint
         else:
             # Profile has finished
@@ -482,15 +481,14 @@ del button_pin
 
 #switch_middle.irq(trigger=Pin.IRQ_FALLING, handler=switch_middle_pressed)
 
-
 # Maybe put in function reset when options reloaded as they may affect settings
-#Termocouple K type
+#Thermocouple K type
 #MAX6675
 
-# Initialize termocouple before switching on heater
+# Initialize thermocouple before switching on heater
 try:
     utime.sleep_ms(100)
-    thermocouple = Thermocouple(hardware_pin_termocouple_sck, hardware_pin_termocouple_cs, hardware_pin_termocouple_so, shared_state.heater_on_temperature_difference_threshold, shared_state)
+    thermocouple = Thermocouple(hardware_pin_thermocouple_sck, hardware_pin_thermocouple_cs, hardware_pin_thermocouple_so, shared_state.heater_on_temperature_difference_threshold, shared_state)
     utime.sleep_ms(350)
 except Exception as e:
     error_text = "Thermocouple init failed: " + str(e)

@@ -1,8 +1,6 @@
 
 import utime
-#import sys ? do we need this?
 import os
-#from machine import ADC, Pin, I2C, Timer, WDT, PWM
 from machine import Pin, I2C, ADC, reset, Timer
 from ssd1306 import SSD1306_I2C
 

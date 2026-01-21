@@ -81,7 +81,7 @@ class SharedState:
                 
         # for the filtered tempterature when induction is on 
         # possibly needs adjusting for different coil sizes/current/voltages - 
-        # maybe need way to reset this in the termocouple class if loading setting between reboots?
+        # maybe need way to reset this in the thermocouple class if loading setting between reboots?
         # calibrate by placeing thermopile in induction coil and seeing effects on readings when on / off 
         # dont set this too low 
         self.heater_on_temperature_difference_threshold = 20 #for induction heaters
@@ -114,7 +114,6 @@ class SharedState:
         self.temperature_setpoint_readings = deque([], self.display_width)  # Stores setpoint values for graphing
         
         self.pi_temperature = 0         # PI Pico chip temperature
-        self.pi_temperature_limit = 60  # Maybe place pico board above/next to mosfet module so we get some idea hot its getting 
 
         #Maybe make below options have more info eg:
         # setup_rotary_values in inputhandler 
