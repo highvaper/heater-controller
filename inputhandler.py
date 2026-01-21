@@ -1,7 +1,7 @@
 import utime
 from machine import Timer, Pin
 from rotary_irq_rp2 import RotaryIRQ
-from customtimer import CustomTimer
+import utils
 
 class InputHandler:
     def __init__(self, rotary_clk_pin, rotary_dt_pin, button_pin, switch_control_pin, middle_button_pin, shared_state):
@@ -19,7 +19,7 @@ class InputHandler:
         self.last_button_press_time = 0
 
         self.click_counter = 0 
-        self.click_check_timer = CustomTimer(period=self.shared_state.click_check_timeout, mode=Timer.ONE_SHOT, callback=self.check_click_count)
+        self.click_check_timer = utils.CustomTimer(period=self.shared_state.click_check_timeout, mode=Timer.ONE_SHOT, callback=self.check_click_count)
         
         self.previous_rotary_value = self.rotary.value() # Initialize the previous rotary value
 
@@ -33,7 +33,7 @@ class InputHandler:
         self.middle_button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.middle_button_state_changed)
         self.middle_button_click_counter = 0
         self.middle_button_last_press_time = 0
-        self.middle_button_click_check_timer = CustomTimer(period=self.shared_state.click_check_timeout, mode=Timer.ONE_SHOT, callback=self.check_middle_button_click_count)
+        self.middle_button_click_check_timer = utils.CustomTimer(period=self.shared_state.click_check_timeout, mode=Timer.ONE_SHOT, callback=self.check_middle_button_click_count)
         
         print("InputHandler initialised.")
 

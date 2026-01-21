@@ -83,14 +83,18 @@ class PID(object):
             # Use the user supplied time function
             self.time_fn = time_fn
         else:
-            import time
-
-            try:
-                # Get monotonic time to ensure that time deltas are always positive
-                self.time_fn = time.monotonic
-            except AttributeError:
-                # time.monotonic() not available (using python < 3.3), fallback to time.time()
-                self.time_fn = time.time
+            # import time
+            #
+            # try:
+            #     # Get monotonic time to ensure that time deltas are always positive
+            #     self.time_fn = time.monotonic
+            # except AttributeError:
+            #     # time.monotonic() not available (using python < 3.3), fallback to time.time()
+            #     self.time_fn = time.time
+            
+            # MicroPython optimization: use utime.ticks_ms directly
+            import utime
+            self.time_fn = lambda: utime.ticks_ms() / 1000.0
 
         self.output_limits = output_limits
         self.reset()

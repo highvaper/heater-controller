@@ -1,28 +1,16 @@
 
 import utime
-import sys
-
 from collections import deque
-
 import machine
 from machine import ADC, Pin, I2C, Timer, WDT, PWM, reset
-
-from ssd1306 import SSD1306_I2C
-
 import uasyncio as asyncio
 
-from simple_pid import PID
-
-from customtimer import CustomTimer
 from thermocouple import Thermocouple
 from displaymanager import DisplayManagerFactory
 from inputhandler import InputHandler
 from menusystem import MenuSystem
-
-from heaters import HeaterFactory, InductionHeater, ElementHeater
-
+from heaters import HeaterFactory
 import utils
-
 from shared_state import SharedState
 
 
@@ -246,7 +234,7 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
                 if shared_state.get_mode() != "Off":
                     heater.on(power)
             # Set power only when temperature is safe
-            if isinstance(heater, ElementHeater):
+            if shared_state.heater_type == 'element':
                 heater.set_power(power)
     else:
         heater.off()  #Maybe we call this no matter what just in case?
@@ -326,7 +314,7 @@ try:
     print("LEDs initialised.")
 except Exception as e:
     print("Error initializing LED pin, unable to continue:", e)
-    sys.exit()
+    reset()
 
 
 
@@ -444,7 +432,6 @@ except Exception as e:
     while True:
         # Flash a LED as a backup - maybe some kind of code like one flash,flash,off,off,flash.off,off etc 
         utime.sleep_ms(100)
-    sys.exit()
 
 
 
@@ -555,7 +542,7 @@ while shared_state.input_volts is False:
 if shared_state.heater_type == 'induction':
     # InductionHeater requires timer and coil pins
     # Coil pins need to be defined in hardware.txt, using defaults for now
-    ihTimer = CustomTimer(-1, machine.Timer.PERIODIC, lambda t: None)  # Timer for coil switching
+    ihTimer = utils.CustomTimer(-1, machine.Timer.PERIODIC, lambda t: None)  # Timer for coil switching
     heater = HeaterFactory.create_heater('induction', coil_pins=(12, 13), timer=ihTimer)
 else:
     # ElementHeater (default)
@@ -565,12 +552,12 @@ heater.off()
 
 
 
-pidTimer = CustomTimer(371, machine.Timer.PERIODIC, timerUpdatePIDandHeater)  # need to have timer setup before calling below 
+pidTimer = utils.CustomTimer(371, machine.Timer.PERIODIC, timerUpdatePIDandHeater)  # need to have timer setup before calling below 
 shared_state.heater_temperature, _ = utils.get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer, display_manager, shared_state)
 # Do not start timers here; they'll be started when the asyncio loop is running
 # pidTimer.start()
 # pid.reset()
-piTempTimer = CustomTimer(903, machine.Timer.PERIODIC, timerSetPiTemp)
+piTempTimer = utils.CustomTimer(903, machine.Timer.PERIODIC, timerSetPiTemp)
 print("Timers initialised.")
 
 #enable_watchdog = False
@@ -775,12 +762,8 @@ async def async_main():
         
         except Exception as e:
             print(f"Error in main loop: {e}")
-            # Don't import traceback in MicroPython - it may not be available
-            try:
-                import sys
-                sys.print_exception(e)
-            except:
-                pass
+            # Error details printed above
+            pass
         
         await asyncio.sleep_ms(70)
 

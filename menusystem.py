@@ -1,6 +1,6 @@
 import utime
 from machine import Timer
-from customtimer import CustomTimer
+import utils
 
 class MenuSystem:
     def __init__(self, display_manager, shared_state):
@@ -10,7 +10,7 @@ class MenuSystem:
         self.display_manager = display_manager
         self.shared_state = shared_state
         self.menu_start_time = None 
-        self.timeout_timer = CustomTimer(period=1000, mode=Timer.PERIODIC, callback=self.check_timeout)
+        self.timeout_timer = utils.CustomTimer(period=1000, mode=Timer.PERIODIC, callback=self.check_timeout)
         
         #self.last_displayed_position = self.shared_state.current_menu_position
         #self.last_navigation_time = 0

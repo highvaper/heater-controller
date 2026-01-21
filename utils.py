@@ -3,11 +3,41 @@ import utime
 #import sys ? do we need this?
 import os
 #from machine import ADC, Pin, I2C, Timer, WDT, PWM
-from machine import Pin, I2C, ADC, reset
+from machine import Pin, I2C, ADC, reset, Timer
 from ssd1306 import SSD1306_I2C
-from heaters import HeaterFactory, InductionHeater, ElementHeater
 
 from autosession import AutoSessionTemperatureProfile
+
+
+class CustomTimer:
+    # Need to extend existing Timer function to know if its running or not
+    # Stops timer being started multiple times in case of some recusion or help catch other bugs 
+    def __init__(self, period, mode, callback):
+        self.timer = Timer(-1)
+        self.is_running = False
+        self.period = period
+        self.mode = mode
+        self.callback = callback
+
+    def start(self):
+        if not self.is_running:
+            self.timer.init(period=self.period, mode=self.mode, callback=self.callback)
+            self.is_running = True
+            #print(f"{self.callback.__name__} timer started.")
+        else:
+            raise RuntimeError(f"{self.callback.__name__} timer is already running. Cannot start again without stopping first.")
+
+    def stop(self):
+        if self.is_running:
+            self.timer.deinit()
+            self.is_running = False
+            #print(f"{self.callback.__name__} timer stopped.")
+        else:
+            raise RuntimeError(f"{self.callback.__name__} timer is not running. Cannot stop without starting first.")
+
+    def is_timer_running(self):
+        return self.is_running
+
 
 # Hardware pin configuration
 _voltage_divider_adc_pin = 28  # Default value
@@ -548,9 +578,9 @@ def get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer,
 
     try:
 
-        if isinstance(heater, InductionHeater):
+        if shared_state and shared_state.heater_type == 'induction':
             new_temperature, need_off_temperature = thermocouple.get_filtered_temp(heater.is_on())
-        elif isinstance(heater, ElementHeater):
+        else:  # element heater or no heater type info
             if thermocouple is not None:
                 new_temperature = thermocouple.read_raw_temp()
             else:  
@@ -571,8 +601,7 @@ def get_thermocouple_temperature_or_handle_error(thermocouple, heater, pidTimer,
                     heater.off()
                     print("Pausing heater - " + error_message)
                     return -1, True
-        else:
-            raise ValueError("Unsupported heater type")
+        
         return new_temperature, need_off_temperature
     
     except Exception as e:

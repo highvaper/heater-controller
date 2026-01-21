@@ -2,7 +2,6 @@ import utime
 import uasyncio as asyncio
 from machine import reset
 #from customtimer import CustomTimer
-from heaters import HeaterFactory, InductionHeater, ElementHeater
 
 class DisplayManager:
     # Default display dimensions (can be overridden by driver classes)
@@ -479,7 +478,7 @@ class DisplayManager:
                 t = "T: " + str(int(shared_state.heater_temperature)) + "C (" + str(int(shared_state.temperature_setpoint)) + "C)"
             self.display.text(t, 0, 0)
             t = "V: " + "{:.1f}".format(shared_state.input_volts) + "V"
-            if isinstance(heater, ElementHeater):
+            if shared_state.heater_type == 'element':
                 t = t + " P: " + str(shared_state.watts) + "W"
             self.display.text(t, 0, 8)
 
@@ -513,7 +512,7 @@ class DisplayManager:
                     t = "{:d} {:d} {:d}".format(int(p), int(i), int(d))
                 else:
                     t = "{:d} {:d}".format(int(p), int(i))
-                if heater.is_on() and isinstance(heater, ElementHeater):
+                if heater.is_on() and shared_state.heater_type == 'element':
                     t = t + " P: " + "{:.d}".format(int(heater.get_power()))
                     
             self.display.text(t, 0, 24)
