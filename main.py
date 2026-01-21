@@ -136,6 +136,8 @@ def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termo
     shared_state.temperature_readings.append(int(shared_state.heater_temperature))
     shared_state.input_volts_readings.append(shared_state.input_volts)
 
+    shared_state.temperature_setpoint_readings.append(int(shared_state.temperature_setpoint))
+
     # Calculate watts and append to ring buffer
     if heater.is_on():
         # Calculate actual watts from voltage, resistance, and actual duty cycle
@@ -406,6 +408,7 @@ try:
     shared_state.temperature_readings = deque([], shared_state.display_width)   #  shared_state.display_width * 2 etc to get more data on graphs 
     shared_state.input_volts_readings = deque([], shared_state.display_width)   #  maybe make this adjustable later in profile
     shared_state.watt_readings = deque([], shared_state.display_width)
+    shared_state.temperature_setpoint_readings = deque([], shared_state.display_width)
     # startup screen will be scheduled from async_main so it doesn't block here
 except Exception as e:
     error_text = "Start up failed - [display-setup] " + shared_state.error_messages["display-setup"] + " " + str(e)
@@ -619,9 +622,14 @@ async def async_main():
                     shared_state.current_menu_position = 1
                     # start async home-screen updater (no-op if already running)
                     display_manager.start_home(heater, loop=asyncio.get_event_loop() if asyncio else None, interval_ms=200)
+                    # Mark that we're on home screen
+                    if not hasattr(shared_state, '_on_home_screen'):
+                        shared_state._on_home_screen = True
                 else:
-                    # leaving home/menu selection - stop async home updates
-                    display_manager.stop_home()
+                    # leaving home/menu selection - stop async home updates ONCE
+                    if not hasattr(shared_state, '_on_home_screen') or shared_state._on_home_screen:
+                        display_manager.stop_home()
+                        shared_state._on_home_screen = False
                     
                     # Check if user clicked on profiles screen to load a profile
                     if shared_state.rotary_last_mode == "Profiles" and shared_state.profile_load_pending:
@@ -644,7 +652,9 @@ async def async_main():
                     else:
                         if shared_state.rotary_last_mode != shared_state.menu_options[shared_state.current_menu_position]:
                             input_handler.setup_rotary_values()
-                        menu_system.display_selected_option()
+                            # Only call display_selected_option when screen actually changes
+                            menu_system.display_selected_option()
+                        # else: screen hasn't changed, async task is already running and updating display
             else:
                 # we're in the menu; ensure async home-screen updates are stopped
                 display_manager.stop_home()

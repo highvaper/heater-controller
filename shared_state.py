@@ -108,6 +108,8 @@ class SharedState:
         self.watt_readings = deque([], self.display_width)  # Stores watt values
         self.watts = 0
         
+        self.temperature_setpoint_readings = deque([], self.display_width)  # Stores setpoint values for graphing
+        
         self.pi_temperature = 0         # PI Pico chip temperature
         self.pi_temperature_limit = 60  # Maybe place pico board above/next to mosfet module so we get some idea hot its getting 
 

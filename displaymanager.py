@@ -108,6 +108,9 @@ class DisplayManager:
         except Exception:
             pass
         self._screen_task = None
+        # Reset screen option tracking so async tasks are recreated when returning
+        if hasattr(self, '_current_screen_option'):
+            delattr(self, '_current_screen_option')
 
 
     def fill_display(self, text, x=0, y=0, invert=False):
@@ -268,11 +271,18 @@ class DisplayManager:
         last_temp = temperature_readings[-1]
         last_temp_str = str(last_temp) + "C"
 
-        # Draw dotted setpoint line
-        setpoint_y = self.display_height - int(self.shared_state.temperature_setpoint / 10) # Calculate the y-coordinate for the checkpoint
-        dot_spacing = 4 # Adjust this value to change the spacing between dots
-        for x in range(0, self.display_width, dot_spacing):
-            self.display.pixel(x, setpoint_y, 1) 
+        # Draw setpoint line from readings (shows historical changes)
+        setpoint_readings = self.shared_state.temperature_setpoint_readings
+        if setpoint_readings:
+            x_scale_setpoint = self.display_width / len(setpoint_readings)
+            dot_spacing = 4  # Draw every 4th pixel for dotted line
+            for i, setpoint in enumerate(setpoint_readings):
+                x = int(i * x_scale_setpoint)
+                # Only draw at dotted intervals
+                if x % dot_spacing == 0:
+                    setpoint_y = self.display_height - int(setpoint / 10)
+                    if 0 <= setpoint_y < self.display_height:
+                        self.display.pixel(x, setpoint_y, 1)
             
         # Display the last temperature reading and other information
         t = last_temp_str
@@ -308,15 +318,19 @@ class DisplayManager:
             if abs(temp - setpoint) < zoom_range:
                 self.display.pixel(x, y, 1) # Draw the pixel
 
-        # Draw dotted setpoint line
-        dot_spacing = 4
-        counter = 0
-        for x in range(0, self.display_width, 1):
-            if counter < 2: # Draw on pixels for the first 2 iterations
-                self.display.pixel(x, setpoint_y, 1) # Draw an on pixel
-            counter += 1 # Increment the counter
-            if counter == 4: # Reset the counter after drawing 2 on and 2 off pixels
-                counter = 0
+        # Draw setpoint line from readings (shows historical changes)
+        setpoint_readings = self.shared_state.temperature_setpoint_readings
+        if setpoint_readings:
+            x_scale_setpoint = self.display_width / len(setpoint_readings)
+            dot_spacing = 4  # Draw every 4th pixel for dotted line
+            for i, sp in enumerate(setpoint_readings):
+                x = int(i * x_scale_setpoint)
+                # Only draw at dotted intervals
+                if x % dot_spacing == 0:
+                    # Calculate y relative to center (setpoint_y)
+                    sp_y = int(setpoint_y + (sp - setpoint) * -1)
+                    if 0 <= sp_y < display_height:
+                        self.display.pixel(x, sp_y, 1)
 #        for x in range(0, self.display.width, dot_spacing):
 #            self.display.pixel(x, setpoint_y, 1)
 
@@ -378,11 +392,18 @@ class DisplayManager:
         last_temp = temperature_readings[-1]
         last_temp_str = str(last_temp) + "C"
 
-        # Draw dotted setpoint line
-        setpoint_y = self.display_height - int(self.shared_state.temperature_setpoint / 10) # Calculate the y-coordinate for the checkpoint
-        dot_spacing = 4 # Adjust this value to change the spacing between dots
-        for x in range(0, self.display_width, dot_spacing):
-            self.display.pixel(x, setpoint_y, 1) 
+        # Draw setpoint line from readings (shows historical changes)
+        setpoint_readings = self.shared_state.temperature_setpoint_readings
+        if setpoint_readings:
+            x_scale_setpoint = self.display_width / len(setpoint_readings)
+            dot_spacing = 4  # Draw every 4th pixel for dotted line
+            for i, setpoint in enumerate(setpoint_readings):
+                x = int(i * x_scale_setpoint)
+                # Only draw at dotted intervals
+                if x % dot_spacing == 0:
+                    setpoint_y = self.display_height - int(setpoint / 10)
+                    if 0 <= setpoint_y < self.display_height:
+                        self.display.pixel(x, setpoint_y, 1) 
             
         t = last_temp_str + " " + last_watts_str
         self.display.text(t, 0, 0, 1)
@@ -685,15 +706,21 @@ class DisplayManager:
             if option in graph_options:
                 try:
                     loop = asyncio.get_event_loop()
-                    # Cancel any existing screen task
+                    
+                    # Check if we already have a running task for this exact screen
+                    if hasattr(self, '_screen_task') and self._screen_task is not None and hasattr(self, '_current_screen_option') and self._current_screen_option == option:
+                        # Task already running for this screen, don't recreate
+                        return
+                    
+                    # Cancel any existing screen task (different screen)
                     try:
                         if self._screen_task is not None:
                             self._screen_task.cancel()
                     except Exception:
                         pass
 
-                    # Draw once immediately
-                    method()
+                    # Track which screen we're displaying
+                    self._current_screen_option = option
 
                     async def _screen_loop():
                         while getattr(self.shared_state, 'current_menu_position', 1) > 1 and not getattr(self.shared_state, 'in_menu', False):
