@@ -23,3 +23,5 @@ autosession_logging_enabled=false
 
 # Autosession log buffer flush threshold (number of lines before flushing to file)
 # autosession_log_buffer_flush_threshold=20
+
+#hardware=broken_thermocouple_test
