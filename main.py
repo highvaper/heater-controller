@@ -60,7 +60,7 @@ def timerSetPiTemp(t):
     # Check if the temperature is safe
     if shared_state.pi_temperature > shared_state.pi_temperature_limit:
         try:
-            if not pidTimer.is_timer_running: pidTimer.stop() 
+            if not pidTimer.is_timer_running(): pidTimer.stop() 
             heater.off()
             error_text = shared_state.error_messages.get("pi-too_hot", "PI too hot")
             shared_state.set_error("pi-too_hot", error_text)
@@ -75,7 +75,7 @@ def timerSetPiTemp(t):
             print("Error updating display or deinitializing timers:", e)
             # dont feed watchdog let it reboot
     else:
-        if not pidTimer.is_timer_running: pidTimer.start()
+        if not pidTimer.is_timer_running(): pidTimer.start()
 
 
 def timerUpdatePIDandHeater(t):  #nmay replace what this does in the check termocouple function 
