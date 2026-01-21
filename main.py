@@ -429,10 +429,10 @@ try:
     display_manager = DisplayManagerFactory.create_display_manager(display_type, display, shared_state)
     # Update shared_state with actual display width and reinitialize ring buffers
     shared_state.display_width = display.width
-    shared_state.temperature_readings = deque([], shared_state.display_width)   #  shared_state.display_width * 2 etc to get more data on graphs 
-    shared_state.input_volts_readings = deque([], shared_state.display_width)   #  maybe make this adjustable later in profile
-    shared_state.watt_readings = deque([], shared_state.display_width)
-    shared_state.temperature_setpoint_readings = deque([], shared_state.display_width)
+    shared_state.temperature_readings = deque([0], shared_state.display_width)   #  shared_state.display_width * 2 etc to get more data on graphs 
+    shared_state.input_volts_readings = deque([0], shared_state.display_width)   #  maybe make this adjustable later in profile
+    shared_state.watt_readings = deque([0], shared_state.display_width)
+    shared_state.temperature_setpoint_readings = deque([0], shared_state.display_width)
     # startup screen will be scheduled from async_main so it doesn't block here
 except Exception as e:
     error_text = "Start up failed - [display-setup] " + shared_state.error_messages["display-setup"] + " " + str(e)
@@ -661,7 +661,7 @@ async def async_main():
                             success, message, needs_reboot = utils.apply_and_save_profile(shared_state.profile_list[shared_state.profile_selection_index], shared_state)
                             if needs_reboot:
                                 display_manager.display.fill(0)
-                                display_manager.display.text("Hardware setup changed", 0, 0, 1)
+                                display_manager.display.text("Hardware changed", 0, 0, 1)
                                 display_manager.display.text("Rebooting...", 0, 8, 1)
                                 display_manager.display.show()
                                 utime.sleep_ms(2000)  # Give time to read the message

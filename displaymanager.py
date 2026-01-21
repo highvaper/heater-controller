@@ -205,10 +205,6 @@ class DisplayManager:
         self.display.fill(0)
 
         temperature_readings = self.shared_state.temperature_readings
-        if not temperature_readings:
-            self.display.text("No data yet", 0, 0, 1)
-            self.display.show()
-            return
         
         # Calculate min and max temperatures once
         min_temp = min(temperature_readings)
@@ -254,10 +250,6 @@ class DisplayManager:
         self.display.fill(0)
 
         temperature_readings = self.shared_state.temperature_readings
-        if not temperature_readings:
-            self.display.text("No data yet", 0, 0, 1)
-            self.display.show()
-            return
 
         x_scale = self.display_width / len(temperature_readings)
 
@@ -298,10 +290,6 @@ class DisplayManager:
         self.display.fill(0)
 
         temperature_readings = self.shared_state.temperature_readings
-        if not temperature_readings:
-            self.display.text("No data yet", 0, 0, 1)
-            self.display.show()
-            return
 
         setpoint = self.shared_state.temperature_setpoint
         display_height = self.display_height
@@ -355,16 +343,7 @@ class DisplayManager:
         self.display.fill(0)
 
         watt_readings = self.shared_state.watt_readings
-        if not watt_readings:
-            self.display.text("No data yet", 0, 0, 1)
-            self.display.show()
-            return
-
         temperature_readings = self.shared_state.temperature_readings
-        if not temperature_readings:
-            self.display.text("No data yet", 0, 0, 1)
-            self.display.show()
-            return
 
         x_scale = self.display_width / len(watt_readings)
         y_scale = self.shared_state.max_watts / self.display_height
@@ -416,10 +395,6 @@ class DisplayManager:
         self.display.fill(0)
 
         watt_readings = self.shared_state.watt_readings
-        if not watt_readings:
-            self.display.text("No data yet", 0, 0, 1)
-            self.display.show()
-            return
 
         x_scale = self.display_width / len(watt_readings)
         y_scale = self.shared_state.max_watts / self.display_height
