@@ -222,11 +222,11 @@ class InputHandler:
 
     def button_state_changed(self, pin):
         current_time = utime.ticks_ms()
-        # Debounce: ignore state changes that occur too quickly after the last one
-        if utime.ticks_diff(current_time, self.last_button_state_change_time) < self.button_debounce_ms:
-            return
-        self.last_button_state_change_time = current_time
         if pin.value() == 0: # Button is pressed
+            # Debounce: ignore rapid press events to filter contact bounce
+            if utime.ticks_diff(current_time, self.last_button_state_change_time) < self.button_debounce_ms:
+                return
+            self.last_button_state_change_time = current_time
             if not self.button_pressed: # Only process the press if the button was not already pressed
                 self.button_pressed = True 
                 time_since_last_press = utime.ticks_diff(current_time, self.last_button_press_time)
@@ -397,11 +397,11 @@ class InputHandler:
 
     def middle_button_state_changed(self, pin):
         current_time = utime.ticks_ms()
-        # Debounce: ignore state changes that occur too quickly after the last one
-        if utime.ticks_diff(current_time, self.middle_button_last_state_change_time) < self.button_debounce_ms:
-            return
-        self.middle_button_last_state_change_time = current_time
         if pin.value() == 0: # Button is pressed
+            # Debounce: ignore rapid press events to filter contact bounce
+            if utime.ticks_diff(current_time, self.middle_button_last_state_change_time) < self.button_debounce_ms:
+                return
+            self.middle_button_last_state_change_time = current_time
             if not self.middle_button_pressed:
                 self.middle_button_pressed = True
                 
