@@ -17,6 +17,8 @@ class InputHandler:
         self.button_pressed = False
         self.button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.button_state_changed)
         self.last_button_press_time = 0
+        self.last_button_state_change_time = 0
+        self.button_debounce_ms = 20  # Ignore state changes within this window to filter contact bounce
 
         self.click_counter = 0 
         self.click_check_timer = utils.CustomTimer(period=self.shared_state.click_check_timeout, mode=Timer.ONE_SHOT, callback=self.check_click_count)
@@ -33,6 +35,7 @@ class InputHandler:
         self.middle_button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.middle_button_state_changed)
         self.middle_button_click_counter = 0
         self.middle_button_last_press_time = 0
+        self.middle_button_last_state_change_time = 0
         self.middle_button_click_check_timer = utils.CustomTimer(period=self.shared_state.click_check_timeout, mode=Timer.ONE_SHOT, callback=self.check_middle_button_click_count)
         
         print("InputHandler initialised.")
@@ -218,11 +221,15 @@ class InputHandler:
         if self.button_pressed: self.rotary_used = True
 
     def button_state_changed(self, pin):
-        current_time = utime.ticks_ms() 
+        current_time = utime.ticks_ms()
+        # Debounce: ignore state changes that occur too quickly after the last one
+        if utime.ticks_diff(current_time, self.last_button_state_change_time) < self.button_debounce_ms:
+            return
+        self.last_button_state_change_time = current_time
         if pin.value() == 0: # Button is pressed
             if not self.button_pressed: # Only process the press if the button was not already pressed
                 self.button_pressed = True 
-                time_since_last_press = current_time - self.last_button_press_time
+                time_since_last_press = utime.ticks_diff(current_time, self.last_button_press_time)
                 if time_since_last_press < self.shared_state.click_check_timeout:
                     self.click_counter += 1
                 else:
@@ -389,6 +396,11 @@ class InputHandler:
             self.shared_state.rotary_last_mode = None
 
     def middle_button_state_changed(self, pin):
+        current_time = utime.ticks_ms()
+        # Debounce: ignore state changes that occur too quickly after the last one
+        if utime.ticks_diff(current_time, self.middle_button_last_state_change_time) < self.button_debounce_ms:
+            return
+        self.middle_button_last_state_change_time = current_time
         if pin.value() == 0: # Button is pressed
             if not self.middle_button_pressed:
                 self.middle_button_pressed = True

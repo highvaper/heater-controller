@@ -24,7 +24,6 @@ For detailed installation instructions, see [INSTALL.md](INSTALL.md).
 - KY-040 Rotary Encoder
 - Other bits: Push Button and LEDs, buzzer (optional)
 
-
 For induction based heater
 - 5-12V ZVS Low Voltage Induction Heater(s) + Coil(s)
 - High-Power Mosfet Switch (one per induction coil)
@@ -33,38 +32,6 @@ For induction based heater
 For element heater
 - Nichrome coil or similar resistive element
 - Suitable MOSFET and power supply
-
-
-## Example Hardware Layout
-
-```
-[Raspberry Pi Pico]
-    |
-    |---[GPIO 18] ---> [LED]
-    |
-    |---[GPIO 6] ----> [MAX6675 SCK]
-    |---[GPIO 7] ----> [MAX6675 CS]
-    |---[GPIO 8] ----> [MAX6675 SO]
-    |
-    |---[GPIO 1] ----> [SSD1306 SDA]
-    |---[GPIO 0] ----> [SSD1306 SCL]
-    |
-    |---[GPIO 12] ----> [Mosfet Switch] ----> [Induction Heater Coil 1]
-    |---[GPIO 13] ----> [Mosfet Switch] ----> [Induction Heater Coil 2]
-    |
-    |---[GPIO 5] ----> [Rotary Encoder CLK]
-    |---[GPIO 4] ----> [Rotary Encoder DT]
-    |---[GPIO 14] ---> [Button]
-    |
-    |---[GPIO 16] ---> [Buzzer]
-    |---[GPIO 21] ---> [SSD1306 SCL]
-    |---[GPIO 20] ---> [SSD1306 SDA]
-    |---[GPIO 22] ---> [Element Heater]
-    |---[GPIO 23/24/25] ---> [Switches]
-```
-
-Note: This diagram excludes any power connections.
-
 
 
 ## Operating Modes
